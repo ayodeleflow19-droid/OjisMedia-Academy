@@ -1,0 +1,6 @@
+{
+  "name": "OJISMediaAcademy",
+  "description": "Professional landing page and course enrollment platform for OJISMediaAcademy, empowering creatives with hands-on media skills.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
