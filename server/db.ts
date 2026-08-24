@@ -9,9 +9,19 @@ function cleanMongoUri(rawUri?: string): string | undefined {
   return cleaned;
 }
 
+export function cleanDbName(rawName?: string): string {
+  if (!rawName) return 'ojis_media_academy';
+  let cleaned = rawName.trim();
+  // If user accidentally put their username or auth string e.g. "ayodeleflow19_db_user@admin" or "admin"
+  if (cleaned.includes('@') || cleaned === 'admin' || cleaned === 'local' || cleaned === 'sample_mflix') {
+    return 'ojis_media_academy';
+  }
+  return cleaned;
+}
+
 const rawUri = process.env.MONGODB_URI;
 const uri = cleanMongoUri(rawUri);
-const dbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
+const dbName = cleanDbName(process.env.MONGODB_DB_NAME);
 
 let client: MongoClient | null = null;
 let dbInstance: Db | null = null;
@@ -92,7 +102,7 @@ let currentUri: string | undefined = undefined;
 
 export async function getDatabase(): Promise<{ db: Db | null; isConnected: boolean; isFallback: boolean; error?: string }> {
   const activeUri = cleanMongoUri(process.env.MONGODB_URI);
-  const activeDbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
+  const activeDbName = cleanDbName(process.env.MONGODB_DB_NAME);
 
   // If URI changed, reset client
   if (currentUri !== activeUri && client) {
@@ -165,7 +175,7 @@ export function getMemoryStore() {
 }
 
 export function getDatabaseStatus() {
-  const activeDbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
+  const activeDbName = cleanDbName(process.env.MONGODB_DB_NAME);
   return {
     configured: Boolean(process.env.MONGODB_URI),
     connected: isConnected,

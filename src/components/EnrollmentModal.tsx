@@ -132,20 +132,24 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
     try {
       // Sync with MongoDB backend API
-      await api.submitEnrollment(newEnrollment);
+      const res = await api.submitEnrollment(newEnrollment);
+      const finalEnrollment = (res && res.data) ? res.data : newEnrollment;
 
       // Local optimistic cache
       const stored = localStorage.getItem('ojis_media_enrollments');
       const list: StudentEnrollment[] = stored ? JSON.parse(stored) : [];
-      list.unshift(newEnrollment);
+      list.unshift(finalEnrollment);
       localStorage.setItem('ojis_media_enrollments', JSON.stringify(list));
+
+      setIsSubmitting(false);
+      setSubmittedData(finalEnrollment);
+      onEnrollmentComplete(finalEnrollment);
     } catch (err) {
       console.error('Storage/Sync error:', err);
+      setIsSubmitting(false);
+      setSubmittedData(newEnrollment);
+      onEnrollmentComplete(newEnrollment);
     }
-
-    setIsSubmitting(false);
-    setSubmittedData(newEnrollment);
-    onEnrollmentComplete(newEnrollment);
   };
 
   const handleCopyRef = () => {

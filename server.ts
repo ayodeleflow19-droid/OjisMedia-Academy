@@ -63,6 +63,37 @@ async function startServer() {
       if (db && !isFallback) {
         const collection = db.collection('enrollments');
         await collection.insertOne(document);
+
+        // Also ensure a corresponding user account exists in users collection
+        const usersCollection = db.collection('users');
+        const existingUser = await usersCollection.findOne({ email: document.email.toLowerCase().trim() });
+        if (!existingUser) {
+          const autoUser = {
+            id: `usr_${Date.now()}`,
+            name: document.fullName,
+            email: document.email.toLowerCase().trim(),
+            phone: document.phone || '+234 812 000 0000',
+            role: 'student',
+            password: 'studentpassword2026',
+            identifierCode: `OJIS-STD-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`,
+            status: 'Active',
+            joinedDate: new Date().toISOString().split('T')[0],
+            studentDetails: {
+              enrolledCourseId: document.selectedCourseId,
+              enrolledCourseTitle: document.selectedCourseTitle,
+              cohort: document.preferredCohort || 'April 2026 Cohort',
+              learningMode: document.learningMode || 'Physical',
+              attendancePercentage: 100,
+              completedModules: 0,
+              totalModules: 10,
+              tuitionStatus: 'Pending Review',
+            },
+            createdAt: new Date(),
+            updatedAt: new Date(),
+          };
+          await usersCollection.insertOne(autoUser);
+          console.log(`[Enrollment] Auto-created student user in MongoDB: ${autoUser.email}`);
+        }
       } else {
         getMemoryStore().enrollments.set(document.referenceNumber, document);
       }

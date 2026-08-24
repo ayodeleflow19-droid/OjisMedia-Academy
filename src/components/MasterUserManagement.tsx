@@ -299,12 +299,20 @@ export function MasterUserManagement({ currentUser, onUserListChanged }: MasterU
     try {
       if (editingUser) {
         updateRegisteredUser(userData.id, userData);
-        await api.updateAdminUser(userData.id, userData);
-        showNotification('success', `User "${userData.name}" profile updated successfully.`);
+        const res = await api.updateAdminUser(userData.id, userData);
+        if (!res.success) {
+          showNotification('error', res.error || 'Failed to update user in MongoDB.');
+          return;
+        }
+        showNotification('success', `User "${userData.name}" profile updated successfully in MongoDB.`);
       } else {
         saveRegisteredUser(userData);
-        await api.createAdminUser({ ...userData, password: formPassword || 'ojis2026' });
-        showNotification('success', `New ${userData.role} "${userData.name}" created with ID: ${userData.identifierCode}`);
+        const res = await api.createAdminUser({ ...userData, password: formPassword || 'ojis2026' });
+        if (!res.success) {
+          showNotification('error', res.error || 'Failed to create user in MongoDB.');
+          return;
+        }
+        showNotification('success', `New ${userData.role} "${userData.name}" created in MongoDB with ID: ${userData.identifierCode}`);
       }
 
       await loadUsers();

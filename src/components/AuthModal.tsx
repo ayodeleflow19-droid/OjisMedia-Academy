@@ -221,7 +221,13 @@ export function AuthModal({
         password: studentPassword,
       });
 
-      const finalUser = registerRes.success && registerRes.user ? registerRes.user : newStudent;
+      if (!registerRes.success) {
+        setIsLoading(false);
+        setErrorMessage(registerRes.error || 'Failed to create student account in MongoDB. Please try again.');
+        return;
+      }
+
+      const finalUser = registerRes.user || newStudent;
 
       saveRegisteredUser(finalUser);
       setStoredUser(finalUser);
@@ -314,7 +320,14 @@ export function AuthModal({
         ...newInstructor,
         password: instructorPassword,
       });
-      const finalUser = regRes.success && regRes.user ? regRes.user : newInstructor;
+
+      if (!regRes.success) {
+        setIsLoading(false);
+        setErrorMessage(regRes.error || 'Failed to submit faculty registration in MongoDB.');
+        return;
+      }
+
+      const finalUser = regRes.user || newInstructor;
 
       saveRegisteredUser(finalUser);
       setStoredUser(finalUser);
@@ -442,7 +455,14 @@ export function AuthModal({
         ...newAdmin,
         password: adminPassword,
       });
-      const finalUser = regRes.success && regRes.user ? regRes.user : newAdmin;
+
+      if (!regRes.success) {
+        setIsLoading(false);
+        setErrorMessage(regRes.error || 'Failed to register admin clearance in MongoDB.');
+        return;
+      }
+
+      const finalUser = regRes.user || newAdmin;
 
       saveRegisteredUser(finalUser);
       setStoredUser(finalUser);
