@@ -1,7 +1,16 @@
 import { MongoClient, Db } from 'mongodb';
 import { SEED_CATEGORIES, SEED_COURSES } from './seedData';
 
-const uri = process.env.MONGODB_URI;
+function cleanMongoUri(rawUri?: string): string | undefined {
+  if (!rawUri) return undefined;
+  let cleaned = rawUri.trim();
+  // Strip accidental angle brackets from password: :<password>@ -> :password@
+  cleaned = cleaned.replace(/:<([^>]+)>@/, ':$1@');
+  return cleaned;
+}
+
+const rawUri = process.env.MONGODB_URI;
+const uri = cleanMongoUri(rawUri);
 const dbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
 
 let client: MongoClient | null = null;
@@ -79,12 +88,27 @@ function formatDbErrorMessage(err: any): string {
  * Initialize or retrieve the MongoDB database instance.
  * Uses lazy connection, rapid timeouts, and graceful fallback.
  */
+let currentUri: string | undefined = undefined;
+
 export async function getDatabase(): Promise<{ db: Db | null; isConnected: boolean; isFallback: boolean; error?: string }> {
+  const activeUri = cleanMongoUri(process.env.MONGODB_URI);
+  const activeDbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
+
+  // If URI changed, reset client
+  if (currentUri !== activeUri && client) {
+    try { await client.close(); } catch (_) {}
+    client = null;
+    dbInstance = null;
+    isConnected = false;
+    lastError = null;
+  }
+  currentUri = activeUri;
+
   if (dbInstance && isConnected) {
     return { db: dbInstance, isConnected: true, isFallback: false };
   }
 
-  if (!uri || uri.trim() === '' || uri.includes('MY_MONGODB_URI')) {
+  if (!activeUri || activeUri.trim() === '' || activeUri.includes('MY_MONGODB_URI')) {
     return {
       db: null,
       isConnected: false,
@@ -101,7 +125,7 @@ export async function getDatabase(): Promise<{ db: Db | null; isConnected: boole
   try {
     lastAttemptTime = now;
     if (!client) {
-      client = new MongoClient(uri, {
+      client = new MongoClient(activeUri, {
         serverSelectionTimeoutMS: 3000,
         connectTimeoutMS: 3000,
         socketTimeoutMS: 5000,
@@ -113,10 +137,10 @@ export async function getDatabase(): Promise<{ db: Db | null; isConnected: boole
     await client.connect();
     // Test ping
     await client.db('admin').command({ ping: 1 });
-    dbInstance = client.db(dbName);
+    dbInstance = client.db(activeDbName);
     isConnected = true;
     lastError = null;
-    console.log(`[MongoDB] Successfully connected to database: "${dbName}"`);
+    console.log(`[MongoDB] Successfully connected to database: "${activeDbName}"`);
 
     // Ensure initial categories and courses exist in DB
     await seedMongoIfEmpty(dbInstance);
@@ -141,10 +165,11 @@ export function getMemoryStore() {
 }
 
 export function getDatabaseStatus() {
+  const activeDbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
   return {
     configured: Boolean(process.env.MONGODB_URI),
     connected: isConnected,
-    dbName: dbName,
+    dbName: activeDbName,
     lastError: lastError,
     activeCollections: ['enrollments', 'users', 'categories', 'courses', 'attendance', 'submissions', 'inquiries', 'broadcasts']
   };
