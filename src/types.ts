@@ -186,7 +186,7 @@ export interface UserAccount {
   // Admin Specific
   adminDetails?: {
     department: 'Admissions' | 'Academic Board' | 'Studio Operations' | 'Finance & Registrar';
-    clearanceLevel: 'Super Admin' | 'Dean / Director' | 'Operations Lead' | 'Admissions Officer';
+    clearanceLevel: 'Master Executive Director & Chancellor' | 'Super Admin' | 'Dean / Director' | 'Operations Lead' | 'Admissions Officer';
     authorizedLocations: string[];
   };
 }

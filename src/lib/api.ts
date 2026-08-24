@@ -89,12 +89,12 @@ export const api = {
   /**
    * Login user via MongoDB
    */
-  async loginUser(identifier: string, password?: string, role?: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+  async loginUser(identifier: string, password?: string, role?: string, pin?: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
     try {
       const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ identifier, password, role }),
+        body: JSON.stringify({ identifier, password, role, pin }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -103,6 +103,26 @@ export const api = {
       return { success: false, error: json.error || 'Invalid credentials.' };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Network error connecting to backend.' };
+    }
+  },
+
+  /**
+   * Instant Master Admin PIN Authentication
+   */
+  async verifyMasterPin(pin: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    try {
+      const res = await fetch('/api/auth/master-pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        return { success: true, user: json.user };
+      }
+      return { success: false, error: json.error || 'Invalid Master Security PIN.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error verifying master PIN.' };
     }
   },
 

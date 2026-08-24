@@ -19,9 +19,12 @@ const memoryStore = {
   broadcasts: new Map<string, any>(),
 };
 
+let lastAttemptTime = 0;
+const RETRY_INTERVAL_MS = 15000;
+
 /**
  * Initialize or retrieve the MongoDB database instance.
- * Uses lazy connection and graceful fallback.
+ * Uses lazy connection, rapid timeouts, and graceful fallback.
  */
 export async function getDatabase(): Promise<{ db: Db | null; isConnected: boolean; isFallback: boolean; error?: string }> {
   if (dbInstance && isConnected) {
@@ -33,40 +36,44 @@ export async function getDatabase(): Promise<{ db: Db | null; isConnected: boole
       db: null,
       isConnected: false,
       isFallback: true,
-      error: 'MONGODB_URI environment variable not configured. Operating in high-performance memory store with persistent sync ready.'
+      error: 'MONGODB_URI environment variable not configured. Set MONGODB_URI in Settings to connect to your MongoDB cluster.'
     };
   }
 
+  const now = Date.now();
+  if (lastError && (now - lastAttemptTime < RETRY_INTERVAL_MS)) {
+    return { db: null, isConnected: false, isFallback: true, error: lastError };
+  }
+
   try {
+    lastAttemptTime = now;
     if (!client) {
       client = new MongoClient(uri, {
-        serverApi: {
-          version: ServerApiVersion.v1,
-          strict: false,
-          deprecationErrors: true,
-        },
-        connectTimeoutMS: 8000,
-        socketTimeoutMS: 15000,
+        serverSelectionTimeoutMS: 4000,
+        connectTimeoutMS: 4000,
+        socketTimeoutMS: 8000,
       });
     }
 
-    if (!connectionAttempted || !isConnected) {
-      connectionAttempted = true;
-      console.log(`[MongoDB] Connecting to cluster: ${dbName}...`);
-      await client.connect();
-      // Test ping
-      await client.db('admin').command({ ping: 1 });
-      dbInstance = client.db(dbName);
-      isConnected = true;
-      lastError = null;
-      console.log(`[MongoDB] Successfully connected to database: "${dbName}"`);
-    }
+    console.log(`[MongoDB] Connecting to cluster...`);
+    await client.connect();
+    // Test ping
+    await client.db('admin').command({ ping: 1 });
+    dbInstance = client.db(dbName);
+    isConnected = true;
+    lastError = null;
+    console.log(`[MongoDB] Successfully connected to database: "${dbName}"`);
 
     return { db: dbInstance, isConnected: true, isFallback: false };
   } catch (error: any) {
     isConnected = false;
-    lastError = error?.message || 'Failed to connect to MongoDB';
-    console.warn(`[MongoDB Connection Notice] ${lastError}. Falling back seamlessly.`);
+    dbInstance = null;
+    if (client) {
+      try { await client.close(); } catch (_) {}
+      client = null;
+    }
+    lastError = error?.message || 'Failed to connect to MongoDB cluster.';
+    console.warn(`[MongoDB Notice] ${lastError}`);
     return { db: null, isConnected: false, isFallback: true, error: lastError };
   }
 }

@@ -26,7 +26,9 @@ import {
   Star,
   Check,
   Database,
-  Server
+  Server,
+  Crown,
+  Zap
 } from 'lucide-react';
 import { UserAccount } from '../types';
 import { api, DatabaseHealthResponse } from '../lib/api';
@@ -88,19 +90,30 @@ export function PortalModal({
         {/* Top App Bar */}
         <div className="bg-slate-900 text-white px-5 sm:px-6 py-4 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-blue-900 flex items-center justify-center text-white font-bold flex-shrink-0 shadow-xs">
+            <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 shadow-xs ${
+              user.role === 'admin' 
+                ? 'bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100 border border-amber-400/40' 
+                : 'bg-blue-900'
+            }`}>
               {user.role === 'student' && <GraduationCap className="w-5 h-5" />}
               {user.role === 'instructor' && <BookOpen className="w-5 h-5" />}
-              {user.role === 'admin' && <ShieldCheck className="w-5 h-5" />}
+              {user.role === 'admin' && <Crown className="w-5 h-5 text-amber-200" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
                   {user.name}
                 </h2>
-                <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] uppercase font-bold tracking-wider">
-                  {user.role}
-                </span>
+                {user.role === 'admin' ? (
+                  <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
+                    <Crown className="w-3 h-3 text-amber-400" />
+                    Master Admin
+                  </span>
+                ) : (
+                  <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] uppercase font-bold tracking-wider">
+                    {user.role}
+                  </span>
+                )}
               </div>
               <p className="text-xs text-slate-400 flex items-center gap-2">
                 <span>ID: {user.identifierCode}</span>

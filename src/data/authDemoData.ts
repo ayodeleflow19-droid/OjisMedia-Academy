@@ -1,5 +1,25 @@
 import { UserAccount } from '../types';
 
+export const MASTER_ADMIN_PIN = '2026';
+export const MASTER_ADMIN_SECURITY_CODE = 'OJIS2026';
+
+export const MASTER_ADMIN_ACCOUNT: UserAccount = {
+  id: 'usr-master-adm-001',
+  role: 'admin',
+  name: 'Ayodele (Master Administrator)',
+  email: 'ayodeleflow19@gmail.com',
+  phone: '+234 800 000 2026',
+  avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+  identifierCode: 'OJIS-MASTER-ADM-001',
+  joinedDate: 'Academy Founding Council 2026',
+  status: 'Verified',
+  adminDetails: {
+    department: 'Academic Board',
+    clearanceLevel: 'Master Executive Director & Chancellor',
+    authorizedLocations: ['Lagos Ikeja Main Studio', 'Lekki Annex Hub', 'Online Cloud Campus', 'Executive Studio Soundstage'],
+  },
+};
+
 export const DEMO_ACCOUNTS: Record<'student' | 'instructor' | 'admin', UserAccount> = {
   student: {
     id: 'usr-std-001',
@@ -46,22 +66,7 @@ export const DEMO_ACCOUNTS: Record<'student' | 'instructor' | 'admin', UserAccou
       officeHours: 'Tues & Thurs, 2:00 PM - 5:00 PM',
     },
   },
-  admin: {
-    id: 'usr-adm-001',
-    role: 'admin',
-    name: 'Dr. Victoria Morgan',
-    email: 'admin.morgan@ojismedia.academy',
-    phone: '+234 803 551 2290',
-    avatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=300&auto=format&fit=crop&q=80',
-    identifierCode: 'OJIS-ADM-002',
-    joinedDate: 'September 2022',
-    status: 'Verified',
-    adminDetails: {
-      department: 'Admissions',
-      clearanceLevel: 'Dean / Director',
-      authorizedLocations: ['Lagos Ikeja Main Studio', 'Lekki Annex Hub', 'Online Cloud Campus'],
-    },
-  },
+  admin: MASTER_ADMIN_ACCOUNT,
 };
 
 export const AUTH_STORAGE_KEY = 'ojis_media_current_user';

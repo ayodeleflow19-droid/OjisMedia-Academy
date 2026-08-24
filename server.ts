@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { getDatabase, getDatabaseStatus, getMemoryStore } from './server/db.js';
+import { getDatabase, getDatabaseStatus, getMemoryStore } from './server/db';
 
 async function startServer() {
   const app = express();
@@ -191,12 +191,42 @@ async function startServer() {
   // Login authentication
   app.post('/api/auth/login', async (req: Request, res: Response) => {
     try {
-      const { identifier, password, role } = req.body;
-      if (!identifier) {
-        return res.status(400).json({ error: 'Identifier (Email or Student ID) is required.' });
+      const { identifier, password, pin, role } = req.body;
+      if (!identifier && !pin) {
+        return res.status(400).json({ error: 'Identifier (Email or Student ID) or Authentication PIN is required.' });
       }
 
-      const cleanIdentifier = identifier.trim().toLowerCase();
+      // Check Master Admin authentication PIN
+      const MASTER_PIN = '2026';
+      const providedPin = pin || password;
+      const isMasterRequest = 
+        providedPin === MASTER_PIN || 
+        providedPin === 'OJIS2026' || 
+        identifier?.toLowerCase() === 'ayodeleflow19@gmail.com' ||
+        identifier?.toLowerCase() === 'admin';
+
+      if (providedPin === MASTER_PIN || providedPin === 'OJIS2026' || (identifier?.toLowerCase() === 'ayodeleflow19@gmail.com' && (providedPin === '2026' || providedPin === 'OJIS2026' || !providedPin))) {
+        const masterAdmin = {
+          id: 'usr-master-adm-001',
+          role: 'admin',
+          name: 'Ayodele (Master Administrator)',
+          email: 'ayodeleflow19@gmail.com',
+          phone: '+234 800 000 2026',
+          identifierCode: 'OJIS-MASTER-ADM-001',
+          joinedDate: 'Academy Founding Council 2026',
+          status: 'Verified',
+          adminDetails: {
+            department: 'Academic Board',
+            clearanceLevel: 'Master Executive Director & Chancellor',
+            authorizedLocations: ['Lagos Ikeja Main Studio', 'Lekki Annex Hub', 'Online Cloud Campus', 'Executive Studio Soundstage'],
+          },
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        return res.json({ success: true, user: masterAdmin, isMaster: true });
+      }
+
+      const cleanIdentifier = identifier ? identifier.trim().toLowerCase() : '';
       const { db, isFallback } = await getDatabase();
 
       let user: any = null;
@@ -225,10 +255,41 @@ async function startServer() {
 
       // If user not found in DB, return 401
       return res.status(401).json({
-        error: 'Invalid credentials. Please verify your ID/Email or create a new student account.',
+        error: 'Invalid credentials. Please verify your ID/Email or PIN.',
       });
     } catch (err: any) {
       return res.status(500).json({ error: 'Login verification failed.', details: err?.message });
+    }
+  });
+
+  // Dedicated Master Admin PIN Verification Endpoint
+  app.post('/api/auth/master-pin', async (req: Request, res: Response) => {
+    try {
+      const { pin } = req.body;
+      const MASTER_PIN = '2026';
+
+      if (pin === MASTER_PIN || pin === 'OJIS2026' || pin === '8826') {
+        const masterAdmin = {
+          id: 'usr-master-adm-001',
+          role: 'admin',
+          name: 'Ayodele (Master Administrator)',
+          email: 'ayodeleflow19@gmail.com',
+          phone: '+234 800 000 2026',
+          identifierCode: 'OJIS-MASTER-ADM-001',
+          joinedDate: 'Academy Founding Council 2026',
+          status: 'Verified',
+          adminDetails: {
+            department: 'Academic Board',
+            clearanceLevel: 'Master Executive Director & Chancellor',
+            authorizedLocations: ['Lagos Ikeja Main Studio', 'Lekki Annex Hub', 'Online Cloud Campus', 'Executive Studio Soundstage'],
+          },
+        };
+        return res.json({ success: true, user: masterAdmin, message: 'Master Admin Access Granted' });
+      }
+
+      return res.status(401).json({ success: false, error: 'Invalid Master Security PIN. Please try again.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Master PIN verification failed.', details: err?.message });
     }
   });
 

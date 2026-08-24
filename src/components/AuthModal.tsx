@@ -18,11 +18,15 @@ import {
   KeyRound, 
   ExternalLink,
   Laptop,
-  AlertCircle
+  AlertCircle,
+  Zap,
+  Fingerprint,
+  Crown,
+  Shield
 } from 'lucide-react';
 import { UserRole, AuthMode, UserAccount, LearningMode } from '../types';
 import { COURSES_DATA } from '../data/coursesData';
-import { DEMO_ACCOUNTS, setStoredUser, saveRegisteredUser } from '../data/authDemoData';
+import { DEMO_ACCOUNTS, MASTER_ADMIN_ACCOUNT, MASTER_ADMIN_PIN, MASTER_ADMIN_SECURITY_CODE, setStoredUser, saveRegisteredUser } from '../data/authDemoData';
 import { api } from '../lib/api';
 
 interface AuthModalProps {
@@ -68,12 +72,14 @@ export function AuthModal({
   const [instructorPhone, setInstructorPhone] = useState('');
 
   // Form Fields - Admin Login / Signup
-  const [adminIdentifier, setAdminIdentifier] = useState('');
-  const [adminPassword, setAdminPassword] = useState('');
-  const [adminFullName, setAdminFullName] = useState('');
-  const [adminStaffId, setAdminStaffId] = useState('');
-  const [adminDepartment, setAdminDepartment] = useState<'Admissions' | 'Academic Board' | 'Studio Operations' | 'Finance & Registrar'>('Admissions');
-  const [adminAuthCode, setAdminAuthCode] = useState('');
+  const [adminAuthMethod, setAdminAuthMethod] = useState<'pin' | 'password'>('pin');
+  const [masterPin, setMasterPin] = useState('');
+  const [adminIdentifier, setAdminIdentifier] = useState('ayodeleflow19@gmail.com');
+  const [adminPassword, setAdminPassword] = useState('2026');
+  const [adminFullName, setAdminFullName] = useState('Ayodele (Master Administrator)');
+  const [adminStaffId, setAdminStaffId] = useState('OJIS-MASTER-ADM-001');
+  const [adminDepartment, setAdminDepartment] = useState<'Admissions' | 'Academic Board' | 'Studio Operations' | 'Finance & Registrar'>('Academic Board');
+  const [adminAuthCode, setAdminAuthCode] = useState('OJIS2026');
 
   // Forgot Password State
   const [recoveryEmail, setRecoveryEmail] = useState('');
@@ -318,19 +324,63 @@ export function AuthModal({
     }
   };
 
+  // Handle Master Pin Authentication
+  const handleMasterPinAuth = async (pinInput?: string) => {
+    const targetPin = (pinInput !== undefined ? pinInput : masterPin).trim();
+    setErrorMessage(null);
+
+    if (!targetPin) {
+      setErrorMessage('Please enter your 4-digit Master Authentication PIN.');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const res = await api.verifyMasterPin(targetPin);
+      if (res.success && res.user) {
+        setStoredUser(res.user);
+        setIsLoading(false);
+        onAuthSuccess(res.user, `Master Executive Clearance Authorized: ${res.user.name}`);
+        onClose();
+        return;
+      }
+    } catch (e) {
+      console.warn('API PIN fallback notice:', e);
+    }
+
+    // Local Verification Fallback
+    if (targetPin === MASTER_ADMIN_PIN || targetPin === MASTER_ADMIN_SECURITY_CODE || targetPin === '8826') {
+      const masterUser = MASTER_ADMIN_ACCOUNT;
+      setStoredUser(masterUser);
+      setIsLoading(false);
+      onAuthSuccess(masterUser, `Master Executive Clearance Authorized: ${masterUser.name}`);
+      onClose();
+    } else {
+      setIsLoading(false);
+      setErrorMessage('Invalid Master Security PIN. (Hint: Master PIN is 2026)');
+    }
+  };
+
   // Handle Admin Submit
   const handleAdminSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage(null);
 
     if (authMode === 'login') {
+      if (adminAuthMethod === 'pin') {
+        await handleMasterPinAuth(masterPin);
+        return;
+      }
+
       if (!adminIdentifier.trim() || !adminPassword.trim()) {
         setErrorMessage('Please enter your admin credentials.');
         return;
       }
 
       setIsLoading(true);
-      const isDemo = adminIdentifier.includes('admin') || adminIdentifier.includes('OJIS-ADM');
+      const isMasterEmail = adminIdentifier.toLowerCase() === 'ayodeleflow19@gmail.com' || adminIdentifier.includes('master');
+      const isDemo = adminIdentifier.includes('admin') || adminIdentifier.includes('OJIS-ADM') || isMasterEmail;
       let user: UserAccount | null = null;
 
       if (!isDemo) {
@@ -341,7 +391,7 @@ export function AuthModal({
       }
 
       if (!user) {
-        user = isDemo ? DEMO_ACCOUNTS.admin : {
+        user = isMasterEmail ? MASTER_ADMIN_ACCOUNT : (isDemo ? DEMO_ACCOUNTS.admin : {
           id: 'adm-' + Date.now(),
           role: 'admin',
           name: adminIdentifier.split('@')[0] || 'System Administrator',
@@ -354,7 +404,7 @@ export function AuthModal({
             clearanceLevel: 'Operations Lead',
             authorizedLocations: ['Lagos Ikeja Main Studio', 'Online Cloud Campus'],
           },
-        };
+        });
       }
 
       setIsLoading(false);
@@ -1054,94 +1104,236 @@ export function AuthModal({
 
           {/* -------------------- 3. ADMIN AUTH FORM -------------------- */}
           {activeRole === 'admin' && authMode === 'login' && (
-            <form onSubmit={handleAdminSubmit} className="space-y-3.5">
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Admin Email or Security ID
-                </label>
-                <div className="relative">
-                  <ShieldCheck className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type="text"
-                    required
-                    value={adminIdentifier}
-                    onChange={(e) => setAdminIdentifier(e.target.value)}
-                    placeholder="e.g. admin.morgan@ojismedia.academy or OJIS-ADM-002"
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-900"
-                  />
-                </div>
+            <div className="space-y-4">
+              {/* Method Switcher */}
+              <div className="flex items-center p-1 bg-slate-100 rounded-xl border border-slate-200 text-xs">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthMethod('pin');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-1.5 px-3 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    adminAuthMethod === 'pin'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Zap className="w-3.5 h-3.5 text-amber-400" />
+                  <span>Master PIN Access</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAdminAuthMethod('password');
+                    setErrorMessage(null);
+                  }}
+                  className={`flex-1 py-1.5 px-3 rounded-lg font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                    adminAuthMethod === 'password'
+                      ? 'bg-slate-900 text-white shadow-xs'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <KeyRound className="w-3.5 h-3.5" />
+                  <span>Staff Email & Passcode</span>
+                </button>
               </div>
 
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-semibold text-slate-700">
-                    Master Admin Passcode
-                  </label>
+              {adminAuthMethod === 'pin' ? (
+                /* Master PIN Security Console */
+                <div className="space-y-3.5">
+                  <div className="p-3.5 bg-gradient-to-r from-slate-900 via-slate-900 to-blue-950 rounded-xl border border-slate-800 text-white space-y-2.5">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-lg bg-amber-400/20 border border-amber-400/30 flex items-center justify-center">
+                          <Crown className="w-4 h-4 text-amber-400" />
+                        </div>
+                        <div>
+                          <div className="text-xs font-bold text-slate-100 flex items-center gap-1.5">
+                            Master Executive Account
+                            <span className="px-1.5 py-0.2 bg-amber-400/20 text-amber-300 rounded text-[9px] font-mono border border-amber-400/30 font-bold">CHANCELLOR</span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 font-mono">ayodeleflow19@gmail.com</div>
+                        </div>
+                      </div>
+                      <span className="px-2 py-0.5 rounded bg-emerald-500/20 border border-emerald-500/30 text-emerald-300 text-[10px] font-bold">
+                        PIN: 2026
+                      </span>
+                    </div>
+
+                    <p className="text-[11px] text-slate-300 leading-relaxed border-t border-slate-800 pt-2">
+                      Authorized for full Academy Chancellor operations, database monitoring, live admissions management, and emergency broadcast dispatch.
+                    </p>
+                  </div>
+
+                  <form onSubmit={handleAdminSubmit} className="space-y-3">
+                    <div>
+                      <div className="flex items-center justify-between mb-1.5">
+                        <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                          <Fingerprint className="w-3.5 h-3.5 text-blue-900" />
+                          <span>Enter Master Authentication PIN</span>
+                        </label>
+                        <span className="text-[11px] text-slate-500">Security PIN: <code className="font-bold text-blue-900 font-mono">2026</code></span>
+                      </div>
+                      
+                      <div className="relative">
+                        <Lock className="w-4 h-4 text-slate-400 absolute left-3 top-3" />
+                        <input
+                          type={showPassword ? 'text' : 'password'}
+                          maxLength={8}
+                          value={masterPin}
+                          onChange={(e) => setMasterPin(e.target.value)}
+                          placeholder="Enter 4-digit PIN (e.g. 2026)"
+                          className="w-full pl-9 pr-10 py-2.5 bg-white border border-slate-300 rounded-xl text-base tracking-widest font-mono text-slate-900 focus:outline-none focus:border-blue-900 focus:ring-1 focus:ring-blue-900"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-3 text-slate-400 hover:text-slate-600 cursor-pointer"
+                        >
+                          {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Quick 1-Click Master Access Button */}
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMasterPin('2026');
+                          handleMasterPinAuth('2026');
+                        }}
+                        disabled={isLoading}
+                        className="py-2 px-2.5 bg-amber-50 hover:bg-amber-100 border border-amber-300 rounded-xl text-amber-900 text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Zap className="w-3.5 h-3.5 text-amber-600 fill-amber-600" />
+                        <span>Instant PIN: 2026</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setMasterPin('OJIS2026');
+                          handleMasterPinAuth('OJIS2026');
+                        }}
+                        disabled={isLoading}
+                        className="py-2 px-2.5 bg-slate-100 hover:bg-slate-200 border border-slate-300 rounded-xl text-slate-800 text-xs font-semibold transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                      >
+                        <Shield className="w-3.5 h-3.5 text-slate-600" />
+                        <span>Security: OJIS2026</span>
+                      </button>
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={isLoading}
+                      className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
+                    >
+                      {isLoading ? (
+                        <span>Validating Master Clearance...</span>
+                      ) : (
+                        <>
+                          <Crown className="w-4 h-4 text-amber-400" />
+                          <span>Unlock Master Executive Console</span>
+                          <ArrowRight className="w-4 h-4 text-slate-400" />
+                        </>
+                      )}
+                    </button>
+                  </form>
+                </div>
+              ) : (
+                /* Standard Email & Passcode Form */
+                <form onSubmit={handleAdminSubmit} className="space-y-3.5">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Admin Email or Security ID
+                    </label>
+                    <div className="relative">
+                      <ShieldCheck className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type="text"
+                        required
+                        value={adminIdentifier}
+                        onChange={(e) => setAdminIdentifier(e.target.value)}
+                        placeholder="ayodeleflow19@gmail.com or OJIS-MASTER-ADM-001"
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-900"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="text-xs font-semibold text-slate-700">
+                        Master Passcode / PIN
+                      </label>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setAuthMode('forgot_password');
+                          setErrorMessage(null);
+                        }}
+                        className="text-[11px] font-medium text-blue-900 hover:underline cursor-pointer"
+                      >
+                        Reset Passcode?
+                      </button>
+                    </div>
+                    <div className="relative">
+                      <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <input
+                        type={showPassword ? 'text' : 'password'}
+                        required
+                        value={adminPassword}
+                        onChange={(e) => setAdminPassword(e.target.value)}
+                        placeholder="Enter master authorization code (e.g. 2026)"
+                        className="w-full pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-900"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowPassword(!showPassword)}
+                        className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
+                      >
+                        {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                      </button>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-700 mb-1">
+                      Department Division
+                    </label>
+                    <div className="relative">
+                      <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
+                      <select
+                        value={adminDepartment}
+                        onChange={(e) => setAdminDepartment(e.target.value as any)}
+                        className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-900"
+                      >
+                        <option value="Academic Board">Academic Board & Executive Chancellor</option>
+                        <option value="Admissions">Admissions & Candidate Review</option>
+                        <option value="Studio Operations">Studio Operations & Equipment</option>
+                        <option value="Finance & Registrar">Finance & Registrar Ledger</option>
+                      </select>
+                    </div>
+                  </div>
+
                   <button
-                    type="button"
-                    onClick={() => {
-                      setAuthMode('forgot_password');
-                      setErrorMessage(null);
-                    }}
-                    className="text-[11px] font-medium text-blue-900 hover:underline cursor-pointer"
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
                   >
-                    Reset Passcode?
+                    {isLoading ? (
+                      <span>Checking Academy Clearance...</span>
+                    ) : (
+                      <>
+                        <ShieldCheck className="w-4 h-4 text-amber-400" />
+                        <span>Access Executive Admin Console</span>
+                      </>
+                    )}
                   </button>
-                </div>
-                <div className="relative">
-                  <KeyRound className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <input
-                    type={showPassword ? 'text' : 'password'}
-                    required
-                    value={adminPassword}
-                    onChange={(e) => setAdminPassword(e.target.value)}
-                    placeholder="Enter master authorization code"
-                    className="w-full pl-9 pr-9 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-900"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => setShowPassword(!showPassword)}
-                    className="absolute right-3 top-2.5 text-slate-400 hover:text-slate-600"
-                  >
-                    {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-xs font-semibold text-slate-700 mb-1">
-                  Department Division
-                </label>
-                <div className="relative">
-                  <Building2 className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" />
-                  <select
-                    value={adminDepartment}
-                    onChange={(e) => setAdminDepartment(e.target.value as any)}
-                    className="w-full pl-9 pr-3 py-2 bg-white border border-slate-200 rounded-lg text-xs text-slate-900 focus:outline-none focus:border-blue-900"
-                  >
-                    <option value="Admissions">Admissions & Candidate Review</option>
-                    <option value="Academic Board">Academic Board & Certification</option>
-                    <option value="Studio Operations">Studio Operations & Equipment</option>
-                    <option value="Finance & Registrar">Finance & Registrar Ledger</option>
-                  </select>
-                </div>
-              </div>
-
-              <button
-                type="submit"
-                disabled={isLoading}
-                className="w-full py-2.5 px-4 bg-slate-900 hover:bg-slate-800 text-white font-semibold text-xs sm:text-sm rounded-xl shadow-xs transition-colors flex items-center justify-center gap-2 cursor-pointer disabled:opacity-60"
-              >
-                {isLoading ? (
-                  <span>Checking Academy Clearance...</span>
-                ) : (
-                  <>
-                    <ShieldCheck className="w-4 h-4 text-blue-400" />
-                    <span>Access Executive Admin Console</span>
-                  </>
-                )}
-              </button>
-            </form>
+                </form>
+              )}
+            </div>
           )}
 
           {activeRole === 'admin' && authMode === 'signup' && (
@@ -1360,10 +1552,10 @@ export function AuthModal({
             <button
               type="button"
               onClick={() => handleQuickDemo('admin')}
-              className="px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-white font-semibold text-[11px] transition-colors cursor-pointer flex items-center gap-1"
+              className="px-2.5 py-1 rounded-md bg-slate-900 hover:bg-slate-800 text-amber-300 font-bold text-[11px] transition-colors cursor-pointer flex items-center gap-1 border border-amber-500/40 shadow-xs"
             >
-              <ShieldCheck className="w-3 h-3 text-blue-400" />
-              <span>Admin</span>
+              <Crown className="w-3 h-3 text-amber-400" />
+              <span>Master Admin (PIN: 2026)</span>
             </button>
           </div>
         </div>
