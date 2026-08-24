@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { motion, AnimatePresence } from 'motion/react';
 import { COURSES_DATA } from '../data/coursesData';
 import { Course, LearningMode, StudentEnrollment } from '../types';
 import { api } from '../lib/api';
@@ -168,14 +169,31 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
   };
 
   return (
-    <div 
-      className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto animate-in fade-in duration-150"
-      onClick={onClose}
-    >
-      <div 
-        className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-xl overflow-hidden my-auto max-h-[92vh] flex flex-col"
-        onClick={(e) => e.stopPropagation()}
-      >
+    <AnimatePresence>
+      {isOpen && (
+        <motion.div 
+          key="enrollment-modal-overlay"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          transition={{ duration: 0.22, ease: 'easeOut' }}
+          className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-950/75 backdrop-blur-xs overflow-y-auto"
+          onClick={onClose}
+        >
+          <motion.div 
+            key="enrollment-modal-panel"
+            initial={{ opacity: 0, scale: 0.94, y: 16 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95, y: 12 }}
+            transition={{ 
+              type: 'spring', 
+              damping: 26, 
+              stiffness: 340,
+              mass: 0.8
+            }}
+            className="relative w-full max-w-lg bg-white border border-slate-200 rounded-2xl shadow-2xl overflow-hidden my-auto max-h-[92vh] flex flex-col"
+            onClick={(e) => e.stopPropagation()}
+          >
         
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-3.5 border-b border-slate-200 bg-slate-50 sticky top-0 z-20">
@@ -479,7 +497,9 @@ export const EnrollmentModal: React.FC<EnrollmentModalProps> = ({
 
         </div>
 
-      </div>
-    </div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   );
 };

@@ -1,30 +1,35 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { getStoredCourses, COURSES_UPDATED_EVENT } from '../data/coursesData';
 import { getStoredCategories, CATEGORIES_UPDATED_EVENT } from '../data/categoriesData';
-import { Course, CourseCategory, LearningMode, CategoryItem } from '../types';
+import { getStudentProgressForCourse, STUDENT_PROGRESS_UPDATED_EVENT } from '../data/studentProgress';
+import { Course, CourseCategory, LearningMode, CategoryItem, UserAccount } from '../types';
 import { CourseCard } from './CourseCard';
 import { api } from '../lib/api';
 import { 
   Search, 
   BookOpen, 
   X, 
-  SlidersHorizontal,
-  RotateCcw,
-  Layers,
-  Film,
-  Camera,
-  Scissors,
-  Palette,
-  Smartphone,
-  Sparkles,
-  Mic,
-  Tv,
-  GraduationCap
+  SlidersHorizontal, 
+  RotateCcw, 
+  Layers, 
+  Film, 
+  Camera, 
+  Scissors, 
+  Palette, 
+  Smartphone, 
+  Sparkles, 
+  Mic, 
+  Tv, 
+  GraduationCap,
+  Award,
+  ChevronRight
 } from 'lucide-react';
 
 interface CoursesProps {
   onViewCourseDetails: (course: Course) => void;
   onEnrollCourse: (courseId?: string) => void;
+  currentUser?: UserAccount | null;
+  onOpenPortal?: () => void;
 }
 
 const ICON_MAP: Record<string, React.ElementType> = {
@@ -40,18 +45,26 @@ const ICON_MAP: Record<string, React.ElementType> = {
   Layers,
 };
 
-export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollCourse }) => {
+export const Courses: React.FC<CoursesProps> = ({ 
+  onViewCourseDetails, 
+  onEnrollCourse, 
+  currentUser,
+  onOpenPortal
+}) => {
   const [courses, setCourses] = useState<Course[]>(() => getStoredCourses());
   const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(() => getStoredCategories());
   const [selectedCategory, setSelectedCategory] = useState<CourseCategory>('all');
   const [selectedMode, setSelectedMode] = useState<LearningMode | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showOnlyEnrolled, setShowOnlyEnrolled] = useState(false);
+  const [progressVersion, setProgressVersion] = useState(0);
 
   // Initial load and listeners for dynamic updates
   useEffect(() => {
     const refreshData = () => {
       setCourses(getStoredCourses());
       setCategoriesList(getStoredCategories());
+      setProgressVersion(v => v + 1);
     };
 
     // Load from backend if available
@@ -77,10 +90,12 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
 
     window.addEventListener(COURSES_UPDATED_EVENT, refreshData);
     window.addEventListener(CATEGORIES_UPDATED_EVENT, refreshData);
+    window.addEventListener(STUDENT_PROGRESS_UPDATED_EVENT, refreshData);
 
     return () => {
       window.removeEventListener(COURSES_UPDATED_EVENT, refreshData);
       window.removeEventListener(CATEGORIES_UPDATED_EVENT, refreshData);
+      window.removeEventListener(STUDENT_PROGRESS_UPDATED_EVENT, refreshData);
     };
   }, []);
 
@@ -88,6 +103,12 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
   const activeCourses = useMemo(() => {
     return courses.filter((c) => c.status !== 'suspended');
   }, [courses]);
+
+  // Compute total enrolled courses for active student
+  const enrolledCoursesCount = useMemo(() => {
+    return activeCourses.filter(c => !!getStudentProgressForCourse(c.id, currentUser)).length;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCourses, currentUser, progressVersion]);
 
   // Dynamic categories with live counts from active courses
   const categories = useMemo(() => {
@@ -124,16 +145,22 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
     return items;
   }, [categoriesList, activeCourses]);
 
-  const isFiltered = selectedCategory !== 'all' || selectedMode !== 'All' || searchQuery.trim().length > 0;
+  const isFiltered = selectedCategory !== 'all' || selectedMode !== 'All' || searchQuery.trim().length > 0 || showOnlyEnrolled;
 
   const handleResetFilters = () => {
     setSelectedCategory('all');
     setSelectedMode('All');
     setSearchQuery('');
+    setShowOnlyEnrolled(false);
   };
 
   const filteredCourses = useMemo(() => {
     return activeCourses.filter((course) => {
+      const courseProgress = getStudentProgressForCourse(course.id, currentUser);
+      if (showOnlyEnrolled && !courseProgress) {
+        return false;
+      }
+
       const matchesCategory = selectedCategory === 'all' || course.category === selectedCategory;
       const matchesMode = selectedMode === 'All' || course.mode === selectedMode || course.mode === 'Hybrid';
       const title = (course.title || '').toLowerCase();
@@ -148,7 +175,8 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
 
       return matchesCategory && matchesMode && matchesSearch;
     });
-  }, [activeCourses, selectedCategory, selectedMode, searchQuery]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeCourses, selectedCategory, selectedMode, searchQuery, showOnlyEnrolled, currentUser, progressVersion]);
 
   return (
     <section id="courses" className="py-12 sm:py-16 md:py-24 bg-slate-50 border-b border-slate-200">
@@ -157,13 +185,19 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
         {/* Section Header */}
         <div className="flex flex-col md:flex-row md:items-end justify-between mb-6 sm:mb-8 gap-4">
           <div className="max-w-2xl">
-            <div className="flex items-center gap-2 mb-2">
+            <div className="flex items-center gap-2 mb-2 flex-wrap">
               <span className="text-xs font-bold uppercase tracking-wider text-blue-900 bg-blue-50 px-2.5 py-1 rounded-md border border-blue-200/60">
                 Academy Programs
               </span>
               <span className="px-2.5 py-1 rounded-md bg-emerald-50 text-emerald-800 text-xs font-semibold border border-emerald-200/60">
                 {activeCourses.length} Curricula Available
               </span>
+              {enrolledCoursesCount > 0 && (
+                <span className="px-2.5 py-1 rounded-md bg-emerald-600 text-white text-xs font-bold shadow-2xs flex items-center gap-1">
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>{enrolledCoursesCount} Enrolled {enrolledCoursesCount === 1 ? 'Track' : 'Tracks'}</span>
+                </span>
+              )}
             </div>
             <h2 className="text-2xl sm:text-3xl lg:text-4xl font-extrabold text-slate-900 tracking-tight">
               Explore Professional Media Disciplines
@@ -179,6 +213,55 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
             </span>
           </div>
         </div>
+
+        {/* ENROLLED STUDENT ACTIVE BANNER & QUICK FILTER */}
+        {enrolledCoursesCount > 0 && (
+          <div className="mb-6 p-4 sm:p-5 rounded-2xl bg-gradient-to-r from-blue-950 via-slate-900 to-emerald-950 text-white border border-emerald-500/30 shadow-md flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-400/40 text-emerald-400 flex items-center justify-center flex-shrink-0">
+                <GraduationCap className="w-5 h-5" />
+              </div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-xs uppercase font-bold text-emerald-400 tracking-wider">
+                    Student Progress Active
+                  </span>
+                  <span className="text-[10px] bg-emerald-500/30 px-2 py-0.2 rounded-full font-extrabold text-emerald-300">
+                    Live Status
+                  </span>
+                </div>
+                <p className="text-xs sm:text-sm text-slate-200 font-medium mt-0.5">
+                  {currentUser?.name ? `Welcome back, ${currentUser.name}.` : 'Student account connected.'}{' '}
+                  Your courses feature live progress bars, module milestones, and class completion metrics below.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap w-full sm:w-auto">
+              <button
+                onClick={() => setShowOnlyEnrolled(!showOnlyEnrolled)}
+                className={`px-3.5 py-2 rounded-xl text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1.5 flex-1 sm:flex-initial whitespace-nowrap active:scale-98 ${
+                  showOnlyEnrolled
+                    ? 'bg-emerald-500 text-slate-950 shadow-xs'
+                    : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                }`}
+              >
+                <Award className="w-3.5 h-3.5" />
+                <span>{showOnlyEnrolled ? 'Showing My Courses' : `Filter My Enrolled (${enrolledCoursesCount})`}</span>
+              </button>
+
+              {onOpenPortal && (
+                <button
+                  onClick={onOpenPortal}
+                  className="px-3.5 py-2 rounded-xl bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold transition-all cursor-pointer flex items-center justify-center gap-1 flex-1 sm:flex-initial whitespace-nowrap active:scale-98 shadow-xs"
+                >
+                  <span>Student Portal</span>
+                  <ChevronRight className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Filter & Discipline Navigator Card */}
         <div className="bg-white rounded-2xl border border-slate-200/90 shadow-xs mb-8 p-4 sm:p-5 lg:p-6 space-y-4">
@@ -286,6 +369,18 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
             <div className="pt-3 border-t border-slate-100 flex items-center justify-between gap-2 flex-wrap text-xs">
               <div className="flex items-center gap-1.5 flex-wrap">
                 <span className="text-xs font-semibold text-slate-500">Active Filters:</span>
+                {showOnlyEnrolled && (
+                  <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-900 text-xs font-semibold border border-emerald-200">
+                    <span>Enrolled Only</span>
+                    <button 
+                      onClick={() => setShowOnlyEnrolled(false)} 
+                      className="hover:text-emerald-950 cursor-pointer p-0.5 rounded hover:bg-emerald-200 transition-colors" 
+                      aria-label="Remove enrolled filter"
+                    >
+                      <X className="w-3 h-3" />
+                    </button>
+                  </span>
+                )}
                 {selectedCategory !== 'all' && (
                   <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-blue-50 text-blue-900 text-xs font-semibold border border-blue-200/80">
                     <span>Track: {categories.find(c => c.id === selectedCategory)?.shortLabel}</span>
@@ -339,14 +434,19 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
         {/* Courses Grid */}
         {filteredCourses.length > 0 ? (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-            {filteredCourses.map((course) => (
-              <CourseCard
-                key={course.id}
-                course={course}
-                onViewDetails={onViewCourseDetails}
-                onEnroll={onEnrollCourse}
-              />
-            ))}
+            {filteredCourses.map((course) => {
+              const progress = getStudentProgressForCourse(course.id, currentUser);
+              return (
+                <CourseCard
+                  key={course.id}
+                  course={course}
+                  onViewDetails={onViewCourseDetails}
+                  onEnroll={onEnrollCourse}
+                  progress={progress}
+                  onOpenPortal={onOpenPortal}
+                />
+              );
+            })}
           </div>
         ) : (
           <div className="bg-white rounded-xl border border-slate-200 p-8 sm:p-12 text-center max-w-md mx-auto shadow-xs">
@@ -373,3 +473,4 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
     </section>
   );
 };
+

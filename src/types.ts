@@ -58,6 +58,20 @@ export interface Course {
   };
 }
 
+export interface StudentCourseProgress {
+  courseId: string;
+  enrolledCourseTitle?: string;
+  cohort?: string;
+  completedModules: number;
+  totalModules: number;
+  progressPercentage: number;
+  status: 'In Progress' | 'Completed' | 'Enrolled' | 'Under Review';
+  attendancePercentage?: number;
+  nextLesson?: string;
+  lastActiveDate?: string;
+  grade?: string;
+}
+
 export interface StudentEnrollment {
   id: string;
   referenceNumber: string;

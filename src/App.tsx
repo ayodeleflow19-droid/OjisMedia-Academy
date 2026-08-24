@@ -166,6 +166,8 @@ export default function App() {
       <Courses 
         onViewCourseDetails={handleViewCourseDetails}
         onEnrollCourse={handleOpenEnrollment}
+        currentUser={currentUser}
+        onOpenPortal={() => setIsPortalModalOpen(true)}
       />
 
       {/* Why Choose Us (6 Features) */}
@@ -224,6 +226,8 @@ export default function App() {
         isOpen={!!selectedCourseDetail}
         onClose={() => setSelectedCourseDetail(null)}
         onEnroll={(courseId) => handleOpenEnrollment(courseId)}
+        currentUser={currentUser}
+        onOpenPortal={() => setIsPortalModalOpen(true)}
       />
 
       {/* 2. Streamlined Fast Enrollment Application Modal */}

@@ -459,6 +459,24 @@ export function PortalModal({
                         <span className="font-semibold">{currentUserData.studentDetails.completedModules} of {currentUserData.studentDetails.totalModules} Modules</span>
                       </div>
                     </div>
+
+                    {/* Overall Progress Bar */}
+                    <div className="pt-2 space-y-1.5">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="text-slate-300 font-medium">Overall Track Completion</span>
+                        <span className="text-emerald-400 font-bold">
+                          {Math.round(((currentUserData.studentDetails.completedModules || 0) / (currentUserData.studentDetails.totalModules || 8)) * 100)}% Complete
+                        </span>
+                      </div>
+                      <div className="w-full bg-white/15 h-2 rounded-full overflow-hidden border border-white/10">
+                        <div 
+                          className="bg-gradient-to-r from-emerald-400 to-teal-300 h-full rounded-full transition-all duration-500"
+                          style={{ 
+                            width: `${Math.min(100, Math.round(((currentUserData.studentDetails.completedModules || 0) / (currentUserData.studentDetails.totalModules || 8)) * 100))}%` 
+                          }}
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
