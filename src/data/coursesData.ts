@@ -325,7 +325,7 @@ export const COURSES_DATA: Course[] = [
     id: 'sound-design',
     slug: 'sound-design',
     title: 'Sound Design & Podcast Audio Production',
-    category: 'filmmaking',
+    category: 'audio',
     popular: false,
     featured: false,
     shortDescription: 'Master audio recording, acoustic treatment, voice mixing, sound effects design, and podcast broadcasting.',
@@ -530,7 +530,7 @@ export const COURSES_DATA: Course[] = [
     id: 'podcast-production',
     slug: 'podcast-production',
     title: 'Podcast Studio Setup & Live Broadcasting',
-    category: 'content',
+    category: 'audio',
     popular: false,
     featured: false,
     shortDescription: 'Master multi-cam podcast filming, live switching, Rodecaster audio, YouTube video podcasting, and distribution.',
@@ -592,10 +592,15 @@ export function getStoredCourses(): Course[] {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
         // Strip out deprecated design courses if previously in localStorage
-        const cleaned = parsed.filter(
-          (c: any) => c.category !== 'design' && c.id !== 'graphic-design' && c.id !== 'ui-design'
-        );
-        if (cleaned.length !== parsed.length) {
+        const cleaned = parsed
+          .filter((c: any) => c.category !== 'design' && c.id !== 'graphic-design' && c.id !== 'ui-design')
+          .map((c: any) => {
+            if (c.id === 'podcast-production' || c.id === 'sound-design') {
+              return { ...c, category: 'audio' };
+            }
+            return c;
+          });
+        if (cleaned.length !== parsed.length || JSON.stringify(cleaned) !== raw) {
           setStoredCourses(cleaned);
         }
         return cleaned.map((c) => ({

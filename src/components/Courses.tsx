@@ -181,25 +181,25 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
         </div>
 
         {/* Filter Controls Card */}
-        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200/90 shadow-sm mb-8 space-y-4">
+        <div className="bg-white p-4 sm:p-5 rounded-2xl border border-slate-200 shadow-xs mb-8 space-y-4">
           
           {/* Top Row: Search & Learning Mode Selector */}
           <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5 sm:gap-3">
             
             {/* Search Input */}
-            <div className="relative sm:col-span-8">
+            <div className="relative sm:col-span-8 lg:col-span-9">
               <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search courses, gear, or software..."
+                placeholder="Search courses, gear, software, or topics..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 bg-slate-50/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 transition-all"
+                className="w-full pl-10 pr-9 py-2.5 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 transition-all shadow-2xs"
               />
               {searchQuery && (
                 <button
                   onClick={() => setSearchQuery('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 cursor-pointer rounded-full hover:bg-slate-200/60"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-700 cursor-pointer rounded-full hover:bg-slate-200/60 transition-colors"
                   aria-label="Clear search"
                 >
                   <X className="w-3.5 h-3.5" />
@@ -208,12 +208,12 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
             </div>
 
             {/* Mode Select */}
-            <div className="sm:col-span-4">
+            <div className="sm:col-span-4 lg:col-span-3">
               <div className="relative">
                 <select
                   value={selectedMode}
                   onChange={(e) => setSelectedMode(e.target.value as any)}
-                  className="w-full py-2.5 pl-3.5 pr-9 bg-slate-50/80 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 appearance-none cursor-pointer"
+                  className="w-full py-2.5 pl-3.5 pr-9 bg-slate-50/70 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 appearance-none cursor-pointer shadow-2xs transition-all"
                 >
                   <option value="All">All Learning Modes</option>
                   <option value="Physical">Physical Studio</option>
@@ -226,7 +226,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
 
           </div>
 
-          {/* Discipline Track Tabs: Perfectly Symmetrical 2-Col Grid on Mobile, Flex on Desktop */}
+          {/* Discipline Track Tabs */}
           <div className="pt-3 border-t border-slate-100 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold text-slate-700">
@@ -236,15 +236,15 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
               {selectedCategory !== 'all' && (
                 <button
                   onClick={() => setSelectedCategory('all')}
-                  className="text-[11px] font-semibold text-blue-900 hover:text-blue-800 cursor-pointer"
+                  className="text-[11px] font-semibold text-blue-900 hover:text-blue-700 cursor-pointer transition-colors"
                 >
                   View All ({activeCourses.length})
                 </button>
               )}
             </div>
 
-            {/* Symmetrical Grid for Mobile & Fluid Wrap for Tablet/Desktop */}
-            <div className="grid grid-cols-2 sm:flex sm:flex-wrap gap-2">
+            {/* Symmetrical, Fluid Grid for Perfectly Balanced Pills */}
+            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
               {categories.map((cat) => {
                 const isActive = selectedCategory === cat.id;
                 const isAll = cat.id === 'all';
@@ -255,23 +255,23 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
                     key={cat.id}
                     id={`track-tab-${cat.id}`}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`flex items-center justify-between sm:justify-start gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none active:scale-[0.98] ${
-                      isAll ? 'col-span-2 sm:col-span-1' : ''
+                    className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none active:scale-[0.98] ${
+                      isAll && categories.length % 2 !== 0 ? 'col-span-2 sm:col-span-1' : ''
                     } ${
                       isActive
-                        ? 'bg-blue-900 text-white shadow-sm ring-2 ring-blue-900/20'
-                        : 'bg-slate-50 hover:bg-slate-100 text-slate-700 border border-slate-200/80 hover:border-slate-300'
+                        ? 'bg-blue-900 text-white shadow-xs border border-blue-900'
+                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 hover:border-slate-300 shadow-2xs'
                     }`}
                   >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <IconComponent className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-white' : 'text-slate-500'}`} />
-                      <span className="truncate">{cat.shortLabel}</span>
+                    <div className="flex items-center gap-1.5 min-w-0">
+                      <IconComponent className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
+                      <span className="truncate text-[11px] sm:text-xs">{cat.shortLabel}</span>
                     </div>
                     
-                    <span className={`text-[10px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0 ml-1.5 ${
+                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold flex-shrink-0 ml-1 ${
                       isActive 
                         ? 'bg-white/20 text-white' 
-                        : 'bg-slate-200/80 text-slate-600'
+                        : 'bg-slate-100 text-slate-600 border border-slate-200/60'
                     }`}>
                       {cat.count}
                     </span>
