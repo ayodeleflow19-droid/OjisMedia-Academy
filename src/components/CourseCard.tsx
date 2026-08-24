@@ -89,7 +89,7 @@ export const CourseCard: React.FC<CourseCardProps> = ({
 
         {/* Outcomes Checklist */}
         <div className="space-y-1.5 pt-2 border-t border-slate-100 text-xs text-slate-600">
-          {course.outcomes.slice(0, 3).map((outcome, i) => (
+          {(course.outcomes || []).slice(0, 3).map((outcome, i) => (
             <div key={i} className="flex items-start gap-1.5 text-[11px] text-slate-600">
               <Check className="w-3.5 h-3.5 text-emerald-600 flex-shrink-0 mt-0.5" />
               <span className="line-clamp-1">{outcome}</span>

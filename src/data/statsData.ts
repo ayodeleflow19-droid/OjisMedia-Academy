@@ -75,11 +75,11 @@ export const INSTRUCTORS_DATA: Instructor[] = [
   {
     id: 'fatima-bello',
     name: 'Fatima Bello',
-    role: 'Brand Designer & Creative Director',
-    specialty: 'Brand Identity Systems, Typography & Print Design',
-    bio: 'Former agency design lead who has crafted brand visual systems for over 40 tech startups, FMCG brands, and cultural institutions.',
+    role: 'Creative Director & Visual Storyteller',
+    specialty: 'Visual Storytelling, Color Harmony & Art Direction',
+    bio: 'Former agency creative lead who has directed brand visual campaigns for over 40 top media productions, startups, and cultural institutions.',
     image: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=600&q=80',
-    coursesTaught: ['Graphic Design & Brand Identity Systems'],
+    coursesTaught: ['Social Media Content Creation & Digital Growth'],
     socialLinks: {
       instagram: 'https://instagram.com',
       linkedin: 'https://linkedin.com'

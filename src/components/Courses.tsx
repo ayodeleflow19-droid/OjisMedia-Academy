@@ -136,11 +136,15 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
     return activeCourses.filter((course) => {
       const matchesCategory = selectedCategory === 'all' || course.category === selectedCategory;
       const matchesMode = selectedMode === 'All' || course.mode === selectedMode || course.mode === 'Hybrid';
+      const title = (course.title || '').toLowerCase();
+      const shortDesc = (course.shortDescription || course.fullDescription || '').toLowerCase();
+      const query = searchQuery.toLowerCase();
       const matchesSearch = 
-        course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        course.shortDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        (course.tools && course.tools.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))) ||
-        (course.outcomes && course.outcomes.some(o => o.toLowerCase().includes(searchQuery.toLowerCase())));
+        !query ||
+        title.includes(query) ||
+        shortDesc.includes(query) ||
+        (Array.isArray(course.tools) && course.tools.some(t => (t || '').toLowerCase().includes(query))) ||
+        (Array.isArray(course.outcomes) && course.outcomes.some(o => (o || '').toLowerCase().includes(query)));
 
       return matchesCategory && matchesMode && matchesSearch;
     });
