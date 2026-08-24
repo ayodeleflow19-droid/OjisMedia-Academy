@@ -243,11 +243,10 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
               )}
             </div>
 
-            {/* Symmetrical, Fluid Grid for Perfectly Balanced Pills */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-7 gap-2">
+            {/* Discipline Track Tabs: Fluid Wrap with Full, Unclipped Labels */}
+            <div className="flex flex-wrap items-center gap-2 sm:gap-2.5">
               {categories.map((cat) => {
                 const isActive = selectedCategory === cat.id;
-                const isAll = cat.id === 'all';
                 const IconComponent = cat.icon;
                 
                 return (
@@ -255,23 +254,19 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
                     key={cat.id}
                     id={`track-tab-${cat.id}`}
                     onClick={() => setSelectedCategory(cat.id)}
-                    className={`flex items-center justify-between gap-1.5 px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer select-none active:scale-[0.98] ${
-                      isAll && categories.length % 2 !== 0 ? 'col-span-2 sm:col-span-1' : ''
-                    } ${
+                    className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-[13px] font-semibold whitespace-nowrap transition-all cursor-pointer select-none active:scale-[0.98] ${
                       isActive
                         ? 'bg-blue-900 text-white shadow-xs border border-blue-900'
-                        : 'bg-white hover:bg-slate-50 text-slate-700 border border-slate-200/90 hover:border-slate-300 shadow-2xs'
+                        : 'bg-slate-50 hover:bg-slate-100/90 text-slate-700 hover:text-slate-900 border border-slate-200/90 hover:border-slate-300'
                     }`}
                   >
-                    <div className="flex items-center gap-1.5 min-w-0">
-                      <IconComponent className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
-                      <span className="truncate text-[11px] sm:text-xs">{cat.shortLabel}</span>
-                    </div>
+                    <IconComponent className={`w-3.5 h-3.5 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
+                    <span className="whitespace-nowrap">{cat.shortLabel}</span>
                     
-                    <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold flex-shrink-0 ml-1 ${
+                    <span className={`text-[10px] sm:text-[11px] px-1.5 py-0.5 rounded-full font-bold flex-shrink-0 ${
                       isActive 
                         ? 'bg-white/20 text-white' 
-                        : 'bg-slate-100 text-slate-600 border border-slate-200/60'
+                        : 'bg-white text-slate-600 border border-slate-200/80'
                     }`}>
                       {cat.count}
                     </span>
