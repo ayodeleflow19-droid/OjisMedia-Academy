@@ -28,10 +28,16 @@ import {
   Database,
   Server,
   Crown,
-  Zap
+  Zap,
+  UserPlus,
+  Shield,
+  MessageSquare,
+  AlertTriangle
 } from 'lucide-react';
-import { UserAccount } from '../types';
+import { UserAccount, UserDirectMessage } from '../types';
 import { api, DatabaseHealthResponse } from '../lib/api';
+import { MasterUserManagement } from './MasterUserManagement';
+import { getStoredUser, setStoredUser, getRegisteredUsers } from '../data/authDemoData';
 
 interface PortalModalProps {
   user: UserAccount | null;
@@ -48,16 +54,14 @@ export function PortalModal({
   onLogout,
   onSwitchRole,
 }: PortalModalProps) {
-  const [activeTab, setActiveTab] = useState<'overview' | 'classes' | 'submissions' | 'id_card' | 'admissions' | 'analytics'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'users' | 'classes' | 'submissions' | 'id_card' | 'admissions' | 'analytics'>('overview');
   const [dbHealth, setDbHealth] = useState<DatabaseHealthResponse | null>(null);
+  const [currentUserData, setCurrentUserData] = useState<UserAccount | null>(user);
   const [attendanceMarked, setAttendanceMarked] = useState<Record<string, boolean>>({
     'std-1': true,
     'std-2': true,
     'std-3': false,
     'std-4': true,
-  });
-  const [gradedProjects, setGradedProjects] = useState<Record<string, { score: number; feedback: string }>>({
-    'proj-1': { score: 95, feedback: 'Superb 3-point lighting setup and color grading depth.' }
   });
   const [approvedAdmissions, setApprovedAdmissions] = useState<Record<string, boolean>>({
     'adm-101': true,
@@ -72,10 +76,26 @@ export function PortalModal({
       api.checkHealth().then(data => {
         if (data) setDbHealth(data);
       });
-    }
-  }, [isOpen]);
 
-  if (!isOpen || !user) return null;
+      // Refresh current user data from storage to pick up new direct messages / updates
+      if (user) {
+        const freshUser = getStoredUser() || user;
+        const all = getRegisteredUsers();
+        const found = all.find(u => u.id === user.id || u.email.toLowerCase() === user.email.toLowerCase());
+        setCurrentUserData(found || freshUser);
+      }
+    }
+  }, [isOpen, user]);
+
+  if (!isOpen || !currentUserData) return null;
+
+  const isMasterChancellor = currentUserData.role === 'admin' && (
+    currentUserData.adminDetails?.clearanceLevel === 'Master Executive Director & Chancellor' ||
+    currentUserData.identifierCode === 'OJIS-MASTER-ADM-001' ||
+    currentUserData.email === 'ayodeleflow19@gmail.com'
+  );
+
+  const directMessages: UserDirectMessage[] = currentUserData.directMessages || [];
 
   return (
     <div 
@@ -83,42 +103,56 @@ export function PortalModal({
       onClick={onClose}
     >
       <div 
-        className="bg-white border border-slate-200 rounded-2xl w-full max-w-4xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-4"
+        className="bg-white border border-slate-200 rounded-2xl w-full max-w-5xl shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-200 my-4"
         onClick={(e) => e.stopPropagation()}
       >
         
         {/* Top App Bar */}
-        <div className="bg-slate-900 text-white px-5 sm:px-6 py-4 flex items-center justify-between border-b border-slate-800">
+        <div className={`text-white px-5 sm:px-6 py-4 flex items-center justify-between border-b ${
+          isMasterChancellor 
+            ? 'bg-gradient-to-r from-slate-950 via-slate-900 to-amber-950 border-amber-500/30' 
+            : 'bg-slate-900 border-slate-800'
+        }`}>
           <div className="flex items-center gap-3">
             <div className={`w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold flex-shrink-0 shadow-xs ${
-              user.role === 'admin' 
+              isMasterChancellor
+                ? 'bg-gradient-to-br from-amber-400 via-amber-500 to-amber-700 text-slate-950 border border-amber-300 shadow-md ring-2 ring-amber-400/30'
+                : currentUserData.role === 'admin' 
                 ? 'bg-gradient-to-br from-amber-500 to-amber-700 text-amber-100 border border-amber-400/40' 
                 : 'bg-blue-900'
             }`}>
-              {user.role === 'student' && <GraduationCap className="w-5 h-5" />}
-              {user.role === 'instructor' && <BookOpen className="w-5 h-5" />}
-              {user.role === 'admin' && <Crown className="w-5 h-5 text-amber-200" />}
+              {currentUserData.role === 'student' && <GraduationCap className="w-5 h-5" />}
+              {currentUserData.role === 'instructor' && <BookOpen className="w-5 h-5" />}
+              {currentUserData.role === 'admin' && <Crown className="w-5 h-5" />}
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <h2 className="text-base sm:text-lg font-bold text-white tracking-tight">
-                  {user.name}
+                  {currentUserData.name}
                 </h2>
-                {user.role === 'admin' ? (
+                {isMasterChancellor ? (
+                  <span className="px-2.5 py-0.5 rounded-full bg-gradient-to-r from-amber-400 to-amber-500 text-slate-950 text-[10px] uppercase font-extrabold tracking-wider flex items-center gap-1 shadow-xs">
+                    <Crown className="w-3 h-3 fill-slate-950" />
+                    MASTER CHANCELLOR
+                  </span>
+                ) : currentUserData.role === 'admin' ? (
                   <span className="px-2 py-0.5 rounded bg-amber-400/20 text-amber-300 border border-amber-400/40 text-[10px] uppercase font-bold tracking-wider flex items-center gap-1">
-                    <Crown className="w-3 h-3 text-amber-400" />
-                    Master Admin
+                    <ShieldCheck className="w-3 h-3 text-amber-400" />
+                    Admin Staff
                   </span>
                 ) : (
                   <span className="px-2 py-0.5 rounded bg-blue-500/20 text-blue-300 border border-blue-400/30 text-[10px] uppercase font-bold tracking-wider">
-                    {user.role}
+                    {currentUserData.role}
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-400 flex items-center gap-2">
-                <span>ID: {user.identifierCode}</span>
+              <p className="text-xs text-slate-300 flex flex-wrap items-center gap-2">
+                <span className="font-mono text-amber-300/90 font-medium">ID: {currentUserData.identifierCode}</span>
                 <span>•</span>
-                <span className="text-emerald-400 font-medium">Session Active</span>
+                <span className="text-emerald-400 font-medium flex items-center gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  Full Master Clearance
+                </span>
               </p>
             </div>
           </div>
@@ -126,7 +160,7 @@ export function PortalModal({
           <div className="flex items-center gap-2">
             <button
               onClick={onSwitchRole}
-              className="px-2.5 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer hidden sm:inline-flex"
+              className="px-2.5 py-1.5 rounded-lg bg-slate-800/80 hover:bg-slate-700 text-slate-200 text-xs font-medium border border-slate-700 transition-colors cursor-pointer hidden sm:inline-flex"
             >
               Switch Role
             </button>
@@ -154,14 +188,55 @@ export function PortalModal({
             onClick={() => setActiveTab('overview')}
             className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
               activeTab === 'overview'
-                ? 'bg-blue-900 text-white'
+                ? 'bg-slate-900 text-white'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
             }`}
           >
-            Dashboard Overview
+            Executive Dashboard
           </button>
 
-          {user.role === 'student' && (
+          {currentUserData.role === 'admin' && (
+            <>
+              <button
+                onClick={() => setActiveTab('users')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap transition-colors cursor-pointer flex items-center gap-1.5 ${
+                  activeTab === 'users'
+                    ? 'bg-blue-900 text-white shadow-xs'
+                    : 'text-blue-950 bg-blue-50 border border-blue-200 hover:bg-blue-100'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>User & Faculty Directory</span>
+                <span className="px-1.5 py-0.2 rounded-full bg-amber-400 text-slate-950 text-[9px] font-extrabold">
+                  Master Power
+                </span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('admissions')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'admissions'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                }`}
+              >
+                Admissions Review
+              </button>
+
+              <button
+                onClick={() => setActiveTab('analytics')}
+                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
+                  activeTab === 'analytics'
+                    ? 'bg-slate-900 text-white'
+                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
+                }`}
+              >
+                Studio Ops & Broadcast
+              </button>
+            </>
+          )}
+
+          {currentUserData.role === 'student' && (
             <>
               <button
                 onClick={() => setActiveTab('classes')}
@@ -196,7 +271,7 @@ export function PortalModal({
             </>
           )}
 
-          {user.role === 'instructor' && (
+          {currentUserData.role === 'instructor' && (
             <>
               <button
                 onClick={() => setActiveTab('classes')}
@@ -221,42 +296,28 @@ export function PortalModal({
             </>
           )}
 
-          {user.role === 'admin' && (
-            <>
-              <button
-                onClick={() => setActiveTab('admissions')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTab === 'admissions'
-                    ? 'bg-blue-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                }`}
-              >
-                Admissions Approval Desk
-              </button>
-              <button
-                onClick={() => setActiveTab('analytics')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-colors cursor-pointer ${
-                  activeTab === 'analytics'
-                    ? 'bg-blue-900 text-white'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-200'
-                }`}
-              >
-                Studio Operations & Broadcast
-              </button>
-            </>
-          )}
-
         </div>
 
         {/* Content Container */}
-        <div className="p-5 sm:p-6 max-h-[65vh] overflow-y-auto">
+        <div className="p-5 sm:p-6 max-h-[68vh] overflow-y-auto">
           
+          {/* ======================= 0. MASTER USER & FACULTY MANAGEMENT TAB ======================= */}
+          {activeTab === 'users' && currentUserData.role === 'admin' && (
+            <MasterUserManagement 
+              currentUser={currentUserData}
+              onUserListChanged={() => {
+                const fresh = getStoredUser();
+                if (fresh) setCurrentUserData(fresh);
+              }}
+            />
+          )}
+
           {/* ======================= 1. OVERVIEW TAB ======================= */}
           {activeTab === 'overview' && (
             <div className="space-y-6">
               
               {/* Student Overview Header Card */}
-              {user.role === 'student' && user.studentDetails && (
+              {currentUserData.role === 'student' && currentUserData.studentDetails && (
                 <div className="bg-gradient-to-br from-blue-900 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md relative overflow-hidden">
                   <div className="relative z-10 space-y-4">
                     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -265,30 +326,30 @@ export function PortalModal({
                           Active Enrolled Track
                         </span>
                         <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white mt-0.5">
-                          {user.studentDetails.enrolledCourseTitle}
+                          {currentUserData.studentDetails.enrolledCourseTitle}
                         </h3>
                       </div>
                       <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold">
-                        {user.studentDetails.tuitionStatus}
+                        {currentUserData.studentDetails.tuitionStatus}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 border-t border-white/10 text-xs">
                       <div>
                         <span className="text-slate-400 block text-[10px]">Cohort Schedule</span>
-                        <span className="font-semibold">{user.studentDetails.cohort}</span>
+                        <span className="font-semibold">{currentUserData.studentDetails.cohort}</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[10px]">Learning Mode</span>
-                        <span className="font-semibold">{user.studentDetails.learningMode} Studio</span>
+                        <span className="font-semibold">{currentUserData.studentDetails.learningMode} Studio</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[10px]">Studio Attendance</span>
-                        <span className="font-semibold text-emerald-400">{user.studentDetails.attendancePercentage}% Verified</span>
+                        <span className="font-semibold text-emerald-400">{currentUserData.studentDetails.attendancePercentage}% Verified</span>
                       </div>
                       <div>
                         <span className="text-slate-400 block text-[10px]">Curriculum Milestone</span>
-                        <span className="font-semibold">{user.studentDetails.completedModules} of {user.studentDetails.totalModules} Modules</span>
+                        <span className="font-semibold">{currentUserData.studentDetails.completedModules} of {currentUserData.studentDetails.totalModules} Modules</span>
                       </div>
                     </div>
                   </div>
@@ -296,78 +357,126 @@ export function PortalModal({
               )}
 
               {/* Instructor Overview Header Card */}
-              {user.role === 'instructor' && user.instructorDetails && (
+              {currentUserData.role === 'instructor' && currentUserData.instructorDetails && (
                 <div className="bg-gradient-to-br from-blue-900 to-slate-900 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <span className="text-xs uppercase font-bold tracking-wider text-blue-300">
-                        {user.instructorDetails.department}
+                        {currentUserData.instructorDetails.department}
                       </span>
                       <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white mt-0.5">
-                        {user.instructorDetails.title}
+                        {currentUserData.instructorDetails.title}
                       </h3>
                     </div>
                     <span className="px-3 py-1 rounded-full bg-amber-400/20 text-amber-300 border border-amber-400/30 text-xs font-bold flex items-center gap-1">
                       <Star className="w-3 h-3 fill-amber-300" />
-                      <span>{user.instructorDetails.rating} Faculty Score</span>
+                      <span>{currentUserData.instructorDetails.rating} Faculty Score</span>
                     </span>
                   </div>
 
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 border-t border-white/10 text-xs">
                     <div>
                       <span className="text-slate-400 block text-[10px]">Assigned Students</span>
-                      <span className="font-semibold">{user.instructorDetails.assignedStudentsCount} Active Creatives</span>
+                      <span className="font-semibold">{currentUserData.instructorDetails.assignedStudentsCount} Active Creatives</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px]">Industry Track Record</span>
-                      <span className="font-semibold">{user.instructorDetails.yearsOfExperience} Years Commercial Experience</span>
+                      <span className="font-semibold">{currentUserData.instructorDetails.yearsOfExperience} Years Commercial Experience</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px]">Active Batches</span>
-                      <span className="font-semibold">{user.instructorDetails.activeBatches.length} Cohorts Assigned</span>
+                      <span className="font-semibold">{currentUserData.instructorDetails.activeBatches.length} Cohorts Assigned</span>
                     </div>
                     <div>
                       <span className="text-slate-400 block text-[10px]">Office & Mentorship Hours</span>
-                      <span className="font-semibold">{user.instructorDetails.officeHours}</span>
+                      <span className="font-semibold">{currentUserData.instructorDetails.officeHours}</span>
                     </div>
                   </div>
                 </div>
               )}
 
-              {/* Admin Overview Header Card */}
-              {user.role === 'admin' && user.adminDetails && (
-                <div className="bg-gradient-to-br from-slate-900 to-blue-950 text-white rounded-2xl p-5 sm:p-6 shadow-md space-y-4">
+              {/* Master Admin Overview Header Card */}
+              {currentUserData.role === 'admin' && currentUserData.adminDetails && (
+                <div className="bg-gradient-to-br from-slate-950 via-slate-900 to-amber-950 text-white rounded-2xl p-5 sm:p-6 shadow-xl border border-amber-500/30 space-y-4">
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
-                      <span className="text-xs uppercase font-bold tracking-wider text-blue-300">
-                        {user.adminDetails.clearanceLevel} Clearance
+                      <span className="text-xs uppercase font-bold tracking-wider text-amber-300 flex items-center gap-1.5">
+                        <Crown className="w-4 h-4 text-amber-400 fill-amber-400" />
+                        <span>{currentUserData.adminDetails.clearanceLevel}</span>
                       </span>
-                      <h3 className="text-xl sm:text-2xl font-bold tracking-tight text-white mt-0.5">
-                        {user.adminDetails.department} Control Center
+                      <h3 className="text-xl sm:text-2xl font-extrabold tracking-tight text-white mt-1">
+                        Academy Executive Governance Suite
                       </h3>
                     </div>
-                    <span className="px-3 py-1 rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-400/30 text-xs font-bold">
-                      Master Authorization Enabled
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => setActiveTab('users')}
+                        className="px-3.5 py-1.5 rounded-lg bg-amber-400 hover:bg-amber-300 text-slate-950 text-xs font-bold flex items-center gap-1.5 shadow-sm transition-colors cursor-pointer"
+                      >
+                        <Users className="w-3.5 h-3.5" />
+                        <span>Manage Users Directory</span>
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 border-t border-amber-500/20 text-xs">
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Authority Level</span>
+                      <span className="font-semibold text-amber-300">Supreme Academic Clearance</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">User Control</span>
+                      <span className="font-semibold text-emerald-400">Full CRUD & Suspension</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Direct Alert Network</span>
+                      <span className="font-semibold text-blue-300">Targeted Messaging Live</span>
+                    </div>
+                    <div>
+                      <span className="text-slate-400 block text-[10px]">Campus Hubs</span>
+                      <span className="font-semibold">{currentUserData.adminDetails.authorizedLocations.length} Facilities Monitored</span>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Direct Messages & Executive Directives Inbox (For all roles) */}
+              {directMessages.length > 0 && (
+                <div className="p-4 rounded-xl bg-amber-50/60 border border-amber-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h4 className="text-xs font-bold uppercase tracking-wider text-amber-950 flex items-center gap-1.5">
+                      <Bell className="w-4 h-4 text-amber-600" />
+                      <span>Direct Executive Alerts & Directives ({directMessages.length})</span>
+                    </h4>
+                    <span className="text-[10px] text-amber-900 font-semibold bg-amber-200/70 px-2 py-0.5 rounded">
+                      Chancellor Dispatch
                     </span>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-3 border-t border-white/10 text-xs">
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Admissions Queue</span>
-                      <span className="font-semibold text-emerald-400">18 Applications Pending</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Active Students</span>
-                      <span className="font-semibold">248 Enrolled</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Soundstages in Use</span>
-                      <span className="font-semibold">Studio A & Editing Suite B</span>
-                    </div>
-                    <div>
-                      <span className="text-slate-400 block text-[10px]">Authorized Hubs</span>
-                      <span className="font-semibold">{user.adminDetails.authorizedLocations.length} Campus Facilities</span>
-                    </div>
+                  <div className="space-y-2">
+                    {directMessages.map((msg) => (
+                      <div key={msg.id} className="p-3 bg-white rounded-xl border border-amber-200/80 shadow-xs space-y-1">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-0.2 rounded text-[10px] font-bold ${
+                              msg.priority === 'urgent' ? 'bg-red-100 text-red-900 border border-red-200' :
+                              msg.priority === 'high' ? 'bg-amber-100 text-amber-900 border border-amber-200' :
+                              'bg-blue-100 text-blue-900'
+                            }`}>
+                              {msg.priority === 'urgent' ? 'URGENT EXECUTIVE' : msg.priority === 'high' ? 'HIGH PRIORITY' : 'DIRECT NOTICE'}
+                            </span>
+                            <strong className="text-xs font-bold text-slate-900">{msg.subject}</strong>
+                          </div>
+                          <span className="text-[10px] text-slate-400">{msg.timestamp}</span>
+                        </div>
+                        <p className="text-xs text-slate-700 leading-relaxed pt-1">
+                          {msg.message}
+                        </p>
+                        <span className="text-[10px] text-blue-900 font-semibold block pt-0.5">
+                          From: {msg.senderName} ({msg.senderRole})
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 </div>
               )}
@@ -445,7 +554,7 @@ export function PortalModal({
           )}
 
           {/* ======================= 2. CLASSES / ROSTER TAB ======================= */}
-          {activeTab === 'classes' && user.role === 'student' && (
+          {activeTab === 'classes' && currentUserData.role === 'student' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -494,7 +603,7 @@ export function PortalModal({
             </div>
           )}
 
-          {activeTab === 'classes' && user.role === 'instructor' && (
+          {activeTab === 'classes' && currentUserData.role === 'instructor' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -551,7 +660,7 @@ export function PortalModal({
               <div className="flex items-center justify-between">
                 <div>
                   <h3 className="text-sm font-bold text-slate-900">
-                    {user.role === 'student' ? 'My Creative Project Uploads' : 'Student Capstone Reviews & Grading'}
+                    {currentUserData.role === 'student' ? 'My Creative Project Uploads' : 'Student Capstone Reviews & Grading'}
                   </h3>
                   <p className="text-xs text-slate-500">
                     Showreel submissions, color grading passes, and photography portfolios
@@ -583,7 +692,7 @@ export function PortalModal({
           )}
 
           {/* ======================= 4. DIGITAL STUDENT ID CARD TAB ======================= */}
-          {activeTab === 'id_card' && user.role === 'student' && (
+          {activeTab === 'id_card' && currentUserData.role === 'student' && (
             <div className="space-y-4">
               <div className="text-center max-w-sm mx-auto">
                 <h3 className="text-sm font-bold text-slate-900">Official Student Identity Pass</h3>
@@ -609,16 +718,16 @@ export function PortalModal({
 
                 <div className="flex items-start gap-4">
                   <img
-                    src={user.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"}
-                    alt={user.name}
+                    src={currentUserData.avatar || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=200&auto=format&fit=crop&q=80"}
+                    alt={currentUserData.name}
                     className="w-20 h-20 rounded-xl object-cover border-2 border-white/30 flex-shrink-0"
                   />
                   <div className="space-y-1 text-xs">
-                    <h4 className="text-base font-bold text-white leading-tight">{user.name}</h4>
-                    <p className="text-blue-300 font-mono text-[11px]">{user.identifierCode}</p>
-                    <p className="text-slate-300 text-[11px]">{user.studentDetails?.enrolledCourseTitle}</p>
+                    <h4 className="text-base font-bold text-white leading-tight">{currentUserData.name}</h4>
+                    <p className="text-blue-300 font-mono text-[11px]">{currentUserData.identifierCode}</p>
+                    <p className="text-slate-300 text-[11px]">{currentUserData.studentDetails?.enrolledCourseTitle}</p>
                     <span className="inline-block px-2 py-0.5 bg-white/10 rounded text-[10px] font-semibold text-slate-200">
-                      {user.studentDetails?.learningMode} Campus Track
+                      {currentUserData.studentDetails?.learningMode} Campus Track
                     </span>
                   </div>
                 </div>
@@ -632,7 +741,7 @@ export function PortalModal({
           )}
 
           {/* ======================= 5. ADMIN ADMISSIONS DESK TAB ======================= */}
-          {activeTab === 'admissions' && user.role === 'admin' && (
+          {activeTab === 'admissions' && currentUserData.role === 'admin' && (
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div>
@@ -678,7 +787,7 @@ export function PortalModal({
           )}
 
           {/* ======================= 6. ADMIN OPERATIONS & BROADCAST ======================= */}
-          {activeTab === 'analytics' && user.role === 'admin' && (
+          {activeTab === 'analytics' && currentUserData.role === 'admin' && (
             <div className="space-y-4">
               {/* Database & Infrastructure Status */}
               <div className="p-4 bg-slate-900 text-white rounded-xl border border-slate-800 space-y-3">
@@ -727,7 +836,7 @@ export function PortalModal({
                 />
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[11px] text-slate-500">Audience: 248 Students, 14 Faculty Members</span>
+                  <span className="text-[11px] text-slate-500">Audience: All Academy Students, Faculty & Staff</span>
                   <button
                     type="button"
                     onClick={async () => {
@@ -735,7 +844,7 @@ export function PortalModal({
                         setBroadcastSent(true);
                         await api.sendBroadcast({
                           message: broadcastMessage.trim(),
-                          sender: `${user.name} (Admin Operations)`
+                          sender: `${currentUserData.name} (Admin Operations)`
                         });
                         setTimeout(() => {
                           setBroadcastSent(false);
@@ -758,7 +867,7 @@ export function PortalModal({
         {/* Footer */}
         <div className="px-5 sm:px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
           <span className="text-slate-500 text-[11px]">
-            Connected as <strong className="text-slate-800">{user.email}</strong>
+            Connected as <strong className="text-slate-800">{currentUserData.email}</strong>
           </span>
           <button
             onClick={onClose}

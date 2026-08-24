@@ -17,6 +17,7 @@ const memoryStore = {
   submissions: new Map<string, any>(),
   inquiries: new Map<string, any>(),
   broadcasts: new Map<string, any>(),
+  direct_messages: new Map<string, any>(),
 };
 
 let lastAttemptTime = 0;

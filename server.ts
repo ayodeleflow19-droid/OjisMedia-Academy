@@ -294,7 +294,229 @@ async function startServer() {
   });
 
   // ==========================================
-  // 4. STUDIO ATTENDANCE & SUBMISSIONS APIS
+  // 4. MASTER ADMIN USER MANAGEMENT & DIRECTORY APIS
+  // ==========================================
+
+  // Get all users (Students, Instructors, Admins)
+  app.get('/api/admin/users', async (_req: Request, res: Response) => {
+    try {
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        const users = await db.collection('users').find({}).sort({ createdAt: -1 }).toArray();
+        const sanitized = users.map((u: any) => {
+          const { password, ...rest } = u;
+          return rest;
+        });
+        return res.json({ success: true, count: sanitized.length, users: sanitized });
+      } else {
+        const memoryUsers = Array.from(getMemoryStore().users.values()).map((u: any) => {
+          const { password, ...rest } = u;
+          return rest;
+        });
+        return res.json({ success: true, count: memoryUsers.length, users: memoryUsers });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch users directory.', details: err?.message });
+    }
+  });
+
+  // Create new user (Student, Instructor, or Admin)
+  app.post('/api/admin/users', async (req: Request, res: Response) => {
+    try {
+      const userData = req.body;
+      if (!userData.name || !userData.email || !userData.role) {
+        return res.status(400).json({ error: 'Name, email, and role are required.' });
+      }
+
+      const cleanEmail = userData.email.trim().toLowerCase();
+      const codePrefix = userData.role === 'student' ? 'OJIS-STD' : (userData.role === 'instructor' ? 'OJIS-FAC' : 'OJIS-ADM');
+      const identifierCode = userData.identifierCode || `${codePrefix}-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+
+      const newUser = {
+        ...userData,
+        id: userData.id || `usr-${Date.now()}`,
+        email: cleanEmail,
+        identifierCode,
+        status: userData.status || 'Active',
+        joinedDate: userData.joinedDate || new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' }),
+        directMessages: userData.directMessages || [],
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      };
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('users').insertOne(newUser);
+      } else {
+        getMemoryStore().users.set(newUser.id, newUser);
+      }
+
+      const { password, ...sanitized } = newUser;
+      return res.status(201).json({ success: true, user: sanitized });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to create user.', details: err?.message });
+    }
+  });
+
+  // Update existing user
+  app.put('/api/admin/users/:id', async (req: Request, res: Response) => {
+    try {
+      const userId = req.params.id;
+      const updates = req.body;
+      delete updates._id; // Ensure MongoDB immutable _id is not updated
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('users').updateOne(
+          { $or: [{ id: userId }, { identifierCode: userId }] },
+          { $set: { ...updates, updatedAt: new Date() } }
+        );
+        const updated = await db.collection('users').findOne({
+          $or: [{ id: userId }, { identifierCode: userId }],
+        });
+        if (updated) {
+          const { password, ...sanitized } = updated;
+          return res.json({ success: true, user: sanitized });
+        }
+      } else {
+        const store = getMemoryStore().users;
+        const current = store.get(userId) || Array.from(store.values()).find((u: any) => u.id === userId || u.identifierCode === userId);
+        if (current) {
+          const updated = { ...current, ...updates, updatedAt: new Date() };
+          store.set(current.id, updated);
+          const { password, ...sanitized } = updated;
+          return res.json({ success: true, user: sanitized });
+        }
+      }
+
+      return res.status(404).json({ error: 'User not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update user.', details: err?.message });
+    }
+  });
+
+  // Delete user (Master Admin cannot be deleted)
+  app.delete('/api/admin/users/:id', async (req: Request, res: Response) => {
+    try {
+      const userId = req.params.id;
+      if (userId === 'usr-master-adm-001' || userId === 'OJIS-MASTER-ADM-001') {
+        return res.status(403).json({ error: 'Master Administrator account cannot be deleted.' });
+      }
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('users').deleteOne({
+          $or: [{ id: userId }, { identifierCode: userId }],
+        });
+      } else {
+        const store = getMemoryStore().users;
+        store.delete(userId);
+      }
+
+      return res.json({ success: true, message: 'User deleted successfully.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to delete user.', details: err?.message });
+    }
+  });
+
+  // Change user status (Suspend, Activate, Verify)
+  app.patch('/api/admin/users/:id/status', async (req: Request, res: Response) => {
+    try {
+      const userId = req.params.id;
+      const { status, reason } = req.body;
+
+      if (!status) {
+        return res.status(400).json({ error: 'Status is required.' });
+      }
+
+      if ((userId === 'usr-master-adm-001' || userId === 'OJIS-MASTER-ADM-001') && status === 'Suspended') {
+        return res.status(403).json({ error: 'Master Chancellor account cannot be suspended.' });
+      }
+
+      const { db, isFallback } = await getDatabase();
+      const statusUpdates: any = { status, updatedAt: new Date() };
+      if (reason !== undefined) statusUpdates.statusReason = reason;
+
+      if (db && !isFallback) {
+        await db.collection('users').updateOne(
+          { $or: [{ id: userId }, { identifierCode: userId }] },
+          { $set: statusUpdates }
+        );
+        const updated = await db.collection('users').findOne({
+          $or: [{ id: userId }, { identifierCode: userId }],
+        });
+        if (updated) {
+          const { password, ...sanitized } = updated;
+          return res.json({ success: true, user: sanitized });
+        }
+      } else {
+        const store = getMemoryStore().users;
+        const current = store.get(userId) || Array.from(store.values()).find((u: any) => u.id === userId || u.identifierCode === userId);
+        if (current) {
+          const updated = { ...current, ...statusUpdates };
+          store.set(current.id, updated);
+          const { password, ...sanitized } = updated;
+          return res.json({ success: true, user: sanitized });
+        }
+      }
+
+      return res.status(404).json({ error: 'User not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update user status.', details: err?.message });
+    }
+  });
+
+  // Send Direct Message / Alert to a specific user
+  app.post('/api/admin/users/:id/message', async (req: Request, res: Response) => {
+    try {
+      const targetUserId = req.params.id;
+      const { subject, message, senderName, senderRole, senderId, priority } = req.body;
+
+      if (!message || !subject) {
+        return res.status(400).json({ error: 'Subject and message are required.' });
+      }
+
+      const messageDoc = {
+        id: `msg_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`,
+        targetUserId,
+        senderId: senderId || 'usr-master-adm-001',
+        senderName: senderName || 'Master Executive Chancellor',
+        senderRole: senderRole || 'Academic Board & Chancellor',
+        subject,
+        message,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: new Date().toISOString(),
+        read: false,
+        priority: priority || 'normal',
+      };
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('direct_messages').insertOne(messageDoc);
+        await db.collection('users').updateOne(
+          { $or: [{ id: targetUserId }, { identifierCode: targetUserId }] },
+          { $push: { directMessages: messageDoc } as any }
+        );
+      } else {
+        getMemoryStore().direct_messages.set(messageDoc.id, messageDoc);
+        const store = getMemoryStore().users;
+        const current = store.get(targetUserId) || Array.from(store.values()).find((u: any) => u.id === targetUserId || u.identifierCode === targetUserId);
+        if (current) {
+          const msgs = current.directMessages || [];
+          msgs.unshift(messageDoc);
+          current.directMessages = msgs;
+          store.set(current.id, current);
+        }
+      }
+
+      return res.status(201).json({ success: true, message: messageDoc });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to send message.', details: err?.message });
+    }
+  });
+
+  // ==========================================
+  // 5. STUDIO ATTENDANCE & SUBMISSIONS APIS
   // ==========================================
 
   // Mark attendance record

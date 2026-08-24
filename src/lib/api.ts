@@ -176,4 +176,128 @@ export const api = {
       return { success: true };
     }
   },
+
+  // ============================================
+  // MASTER ADMIN & USER MANAGEMENT APIS
+  // ============================================
+
+  /**
+   * Fetch all Academy users (Students, Instructors, Admins)
+   */
+  async getAllUsers(): Promise<{ success: boolean; users: UserAccount[] }> {
+    try {
+      const res = await fetch('/api/admin/users');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.users && Array.isArray(json.users)) {
+          return { success: true, users: json.users };
+        }
+      }
+    } catch (e) {
+      console.warn('Backend user fetch error, fallback to local store:', e);
+    }
+    return { success: false, users: [] };
+  },
+
+  /**
+   * Create a new user (Student, Instructor, or Admin)
+   */
+  async createAdminUser(userData: Partial<UserAccount> & { password?: string }): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    try {
+      const res = await fetch('/api/admin/users', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(userData),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, user: json.user };
+      }
+      return { success: false, error: json.error || 'Failed to create user.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error creating user.' };
+    }
+  },
+
+  /**
+   * Update an existing user
+   */
+  async updateAdminUser(id: string, updates: Partial<UserAccount>): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, user: json.user };
+      }
+      return { success: false, error: json.error || 'Failed to update user.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error updating user.' };
+    }
+  },
+
+  /**
+   * Delete a user
+   */
+  async deleteAdminUser(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true };
+      }
+      return { success: false, error: json.error || 'Failed to delete user.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error deleting user.' };
+    }
+  },
+
+  /**
+   * Suspend, Activate or change user status
+   */
+  async updateUserStatus(id: string, status: string, reason?: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status, reason }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, user: json.user };
+      }
+      return { success: false, error: json.error || 'Failed to update user status.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error changing user status.' };
+    }
+  },
+
+  /**
+   * Send a direct message / alert to an individual user
+   */
+  async sendDirectMessage(
+    targetUserId: string,
+    messageData: { subject: string; message: string; senderName: string; senderRole: string; senderId: string; priority?: 'normal' | 'high' | 'urgent' }
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/users/${encodeURIComponent(targetUserId)}/message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(messageData),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true };
+      }
+      return { success: false, error: json.error || 'Failed to send message.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error sending direct message.' };
+    }
+  },
 };
+

@@ -143,7 +143,21 @@ export interface ContactInquiry {
 
 export type UserRole = 'student' | 'instructor' | 'admin';
 
+export type UserStatus = 'Active' | 'Under Review' | 'Verified' | 'Suspended' | 'Inactive';
+
 export type AuthMode = 'login' | 'signup' | 'forgot_password';
+
+export interface UserDirectMessage {
+  id: string;
+  senderId: string;
+  senderName: string;
+  senderRole: string;
+  subject: string;
+  message: string;
+  timestamp: string;
+  read: boolean;
+  priority?: 'normal' | 'high' | 'urgent';
+}
 
 export interface UserAccount {
   id: string;
@@ -152,9 +166,12 @@ export interface UserAccount {
   email: string;
   phone?: string;
   avatar?: string;
-  identifierCode: string; // e.g. OJIS-STD-2026-081, OJIS-FAC-014, OJIS-ADM-002
+  identifierCode: string; // e.g. OJIS-STD-2026-081, OJIS-FAC-014, OJIS-ADM-002, OJIS-MASTER-ADM-001
   joinedDate: string;
-  status: 'Active' | 'Under Review' | 'Verified';
+  status: UserStatus;
+  statusReason?: string;
+  bio?: string;
+  directMessages?: UserDirectMessage[];
   
   // Student Specific
   studentDetails?: {
