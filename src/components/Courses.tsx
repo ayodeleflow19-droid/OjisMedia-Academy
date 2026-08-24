@@ -243,7 +243,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
 
             {/* Responsive Tabs: Structured 2-Col Grid on Mobile, Fluid Inline Pills on Tablet & Desktop */}
             <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5">
-              {categories.map((cat, idx) => {
+              {categories.map((cat) => {
                 const isActive = selectedCategory === cat.id;
                 const IconComponent = cat.icon;
                 const isMasterTrack = cat.id === 'all';
