@@ -711,3 +711,135 @@ export const COURSES_DATA: Course[] = [
     instructorAvatar: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&w=400&q=80'
   }
 ];
+
+export const COURSES_STORAGE_KEY = 'ojis_media_courses';
+export const COURSES_UPDATED_EVENT = 'ojis_courses_updated';
+
+/**
+ * Retrieve all courses from localStorage or default seed
+ */
+export function getStoredCourses(): Course[] {
+  try {
+    const raw = localStorage.getItem(COURSES_STORAGE_KEY);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) {
+        return parsed.map((c) => ({
+          ...c,
+          status: c.status || 'active',
+        }));
+      }
+    }
+  } catch (err) {
+    console.error('Error reading courses from localStorage:', err);
+  }
+
+  // Seed default courses
+  const initial = COURSES_DATA.map((c) => ({
+    ...c,
+    status: c.status || 'active',
+  }));
+  setStoredCourses(initial);
+  return initial;
+}
+
+/**
+ * Save courses to localStorage and broadcast event
+ */
+export function setStoredCourses(courses: Course[]): void {
+  try {
+    localStorage.setItem(COURSES_STORAGE_KEY, JSON.stringify(courses));
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent(COURSES_UPDATED_EVENT, { detail: courses }));
+    }
+  } catch (err) {
+    console.error('Error saving courses to localStorage:', err);
+  }
+}
+
+/**
+ * Get single course by id or slug
+ */
+export function getCourseById(idOrSlug: string): Course | undefined {
+  const all = getStoredCourses();
+  return all.find(
+    (c) => c.id.toLowerCase() === idOrSlug.toLowerCase() || c.slug.toLowerCase() === idOrSlug.toLowerCase()
+  );
+}
+
+/**
+ * Create a new Course (Admin / Master Admin / Authorized Instructor power)
+ */
+export function createStoredCourse(course: Course): Course {
+  const all = getStoredCourses();
+  
+  const cleanId = (course.id || course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')).toLowerCase();
+  
+  const newCourse: Course = {
+    ...course,
+    id: cleanId,
+    slug: course.slug || cleanId,
+    status: course.status || 'active',
+    formattedPrice: course.formattedPrice || `₦${(course.price || 0).toLocaleString()}`,
+    tools: Array.isArray(course.tools) ? course.tools : [],
+    outcomes: Array.isArray(course.outcomes) ? course.outcomes : [],
+    curriculum: Array.isArray(course.curriculum) ? course.curriculum : [],
+  };
+
+  const existingIndex = all.findIndex((c) => c.id === cleanId || c.slug === cleanId);
+  if (existingIndex >= 0) {
+    all[existingIndex] = newCourse;
+  } else {
+    all.unshift(newCourse); // Place new courses at the beginning
+  }
+
+  setStoredCourses(all);
+  return newCourse;
+}
+
+/**
+ * Update an existing Course (Admin & Master Admin power)
+ */
+export function updateStoredCourse(id: string, updates: Partial<Course>): Course | null {
+  const all = getStoredCourses();
+  const index = all.findIndex((c) => c.id.toLowerCase() === id.toLowerCase() || c.slug.toLowerCase() === id.toLowerCase());
+  
+  if (index === -1) return null;
+
+  const current = all[index];
+  const updatedPrice = updates.price !== undefined ? updates.price : current.price;
+  const updatedFormattedPrice = updates.formattedPrice || (updates.price !== undefined ? `₦${updates.price.toLocaleString()}` : current.formattedPrice);
+
+  const updated: Course = {
+    ...current,
+    ...updates,
+    price: updatedPrice,
+    formattedPrice: updatedFormattedPrice,
+  };
+
+  all[index] = updated;
+  setStoredCourses(all);
+  return updated;
+}
+
+/**
+ * Suspend or Activate a Course (Admin & Master Admin power)
+ */
+export function setCourseStatus(id: string, status: 'active' | 'suspended' | 'draft'): Course | null {
+  return updateStoredCourse(id, { status });
+}
+
+/**
+ * Delete a Course (Admin & Master Admin power)
+ */
+export function deleteStoredCourse(id: string): boolean {
+  const all = getStoredCourses();
+  const filtered = all.filter((c) => c.id.toLowerCase() !== id.toLowerCase() && c.slug.toLowerCase() !== id.toLowerCase());
+  
+  if (filtered.length !== all.length) {
+    setStoredCourses(filtered);
+    return true;
+  }
+  return false;
+}
+

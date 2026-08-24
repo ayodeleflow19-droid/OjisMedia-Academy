@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
-import { COURSES_DATA } from '../data/coursesData';
-import { Course, CourseCategory, LearningMode } from '../types';
+import React, { useState, useEffect, useMemo } from 'react';
+import { getStoredCourses, COURSES_UPDATED_EVENT } from '../data/coursesData';
+import { getStoredCategories, CATEGORIES_UPDATED_EVENT } from '../data/categoriesData';
+import { Course, CourseCategory, LearningMode, CategoryItem } from '../types';
 import { CourseCard } from './CourseCard';
+import { api } from '../lib/api';
 import { 
   Search, 
   BookOpen, 
@@ -14,7 +16,10 @@ import {
   Scissors,
   Palette,
   Smartphone,
-  Sparkles
+  Sparkles,
+  Mic,
+  Tv,
+  GraduationCap
 } from 'lucide-react';
 
 interface CoursesProps {
@@ -22,68 +27,102 @@ interface CoursesProps {
   onEnrollCourse: (courseId?: string) => void;
 }
 
+const ICON_MAP: Record<string, React.ElementType> = {
+  Film,
+  Camera,
+  Scissors,
+  Palette,
+  Smartphone,
+  Sparkles,
+  Mic,
+  Tv,
+  GraduationCap,
+  Layers,
+};
+
 export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollCourse }) => {
+  const [courses, setCourses] = useState<Course[]>(() => getStoredCourses());
+  const [categoriesList, setCategoriesList] = useState<CategoryItem[]>(() => getStoredCategories());
   const [selectedCategory, setSelectedCategory] = useState<CourseCategory>('all');
   const [selectedMode, setSelectedMode] = useState<LearningMode | 'All'>('All');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const categories: { 
-    id: CourseCategory; 
-    label: string; 
-    shortLabel: string; 
-    count: number; 
-    icon: React.ElementType;
-  }[] = useMemo(() => [
-    { 
-      id: 'all', 
-      label: 'All Tracks', 
-      shortLabel: 'All Tracks',
-      count: COURSES_DATA.length,
-      icon: Layers
-    },
-    { 
-      id: 'filmmaking', 
-      label: 'Video & Cinematography', 
-      shortLabel: 'Video & Film',
-      count: COURSES_DATA.filter(c => c.category === 'filmmaking').length,
-      icon: Film
-    },
-    { 
-      id: 'photography', 
-      label: 'Photography & Lighting', 
-      shortLabel: 'Photography',
-      count: COURSES_DATA.filter(c => c.category === 'photography').length,
-      icon: Camera
-    },
-    { 
-      id: 'editing', 
-      label: 'Video Editing & Grading', 
-      shortLabel: 'Video Editing',
-      count: COURSES_DATA.filter(c => c.category === 'editing').length,
-      icon: Scissors
-    },
-    { 
-      id: 'design', 
-      label: 'Design & Product UI/UX', 
-      shortLabel: 'Design & UI',
-      count: COURSES_DATA.filter(c => c.category === 'design').length,
-      icon: Palette
-    },
-    { 
-      id: 'content', 
-      label: 'Content Creation & Media', 
-      shortLabel: 'Content Creation',
-      count: COURSES_DATA.filter(c => c.category === 'content').length,
-      icon: Smartphone
-    },
-    { 
-      id: 'motion', 
-      label: 'Motion Graphics & VFX', 
-      shortLabel: 'Motion Graphics',
-      count: COURSES_DATA.filter(c => c.category === 'motion').length,
-      icon: Sparkles
-    }
-  ], []);
+  // Initial load and listeners for dynamic updates
+  useEffect(() => {
+    const refreshData = () => {
+      setCourses(getStoredCourses());
+      setCategoriesList(getStoredCategories());
+    };
+
+    // Load from backend if available
+    const syncFromBackend = async () => {
+      try {
+        const [courseRes, catRes] = await Promise.allSettled([
+          api.getCourses(),
+          api.getCategories(),
+        ]);
+        if (courseRes.status === 'fulfilled' && courseRes.value.success && courseRes.value.courses) {
+          setCourses(courseRes.value.courses);
+        }
+        if (catRes.status === 'fulfilled' && catRes.value.success && catRes.value.categories) {
+          setCategoriesList(catRes.value.categories);
+        }
+      } catch (err) {
+        console.warn('Backend sync notice in Courses component:', err);
+      }
+    };
+
+    refreshData();
+    syncFromBackend();
+
+    window.addEventListener(COURSES_UPDATED_EVENT, refreshData);
+    window.addEventListener(CATEGORIES_UPDATED_EVENT, refreshData);
+
+    return () => {
+      window.removeEventListener(COURSES_UPDATED_EVENT, refreshData);
+      window.removeEventListener(CATEGORIES_UPDATED_EVENT, refreshData);
+    };
+  }, []);
+
+  // Filter out suspended courses for public view
+  const activeCourses = useMemo(() => {
+    return courses.filter((c) => c.status !== 'suspended');
+  }, [courses]);
+
+  // Dynamic categories with live counts from active courses
+  const categories = useMemo(() => {
+    const activeCats = categoriesList.filter((c) => c.status !== 'suspended');
+
+    const items: {
+      id: CourseCategory;
+      label: string;
+      shortLabel: string;
+      count: number;
+      icon: React.ElementType;
+    }[] = [
+      {
+        id: 'all',
+        label: 'All Tracks',
+        shortLabel: 'All Tracks',
+        count: activeCourses.length,
+        icon: Layers,
+      },
+    ];
+
+    activeCats.forEach((cat) => {
+      const IconComp = ICON_MAP[cat.icon] || Layers;
+      const count = activeCourses.filter((c) => c.category === cat.id).length;
+      items.push({
+        id: cat.id as CourseCategory,
+        label: cat.name,
+        shortLabel: cat.shortLabel || cat.name,
+        count,
+        icon: IconComp,
+      });
+    });
+
+    return items;
+  }, [categoriesList, activeCourses]);
 
   const isFiltered = selectedCategory !== 'all' || selectedMode !== 'All' || searchQuery.trim().length > 0;
 
@@ -94,18 +133,18 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
   };
 
   const filteredCourses = useMemo(() => {
-    return COURSES_DATA.filter((course) => {
+    return activeCourses.filter((course) => {
       const matchesCategory = selectedCategory === 'all' || course.category === selectedCategory;
       const matchesMode = selectedMode === 'All' || course.mode === selectedMode || course.mode === 'Hybrid';
       const matchesSearch = 
         course.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
         course.shortDescription.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        course.tools.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
-        course.outcomes.some(o => o.toLowerCase().includes(searchQuery.toLowerCase()));
+        (course.tools && course.tools.some(t => t.toLowerCase().includes(searchQuery.toLowerCase()))) ||
+        (course.outcomes && course.outcomes.some(o => o.toLowerCase().includes(searchQuery.toLowerCase())));
 
       return matchesCategory && matchesMode && matchesSearch;
     });
-  }, [selectedCategory, selectedMode, searchQuery]);
+  }, [activeCourses, selectedCategory, selectedMode, searchQuery]);
 
   return (
     <section id="courses" className="py-12 sm:py-16 md:py-24 bg-slate-50 border-b border-slate-200">
@@ -119,7 +158,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
                 Course Tracks
               </span>
               <span className="px-2 py-0.5 rounded-full bg-blue-100 text-blue-900 text-[10px] font-bold">
-                {COURSES_DATA.length} Available Programs
+                {activeCourses.length} Available Programs
               </span>
             </div>
             <h2 className="text-2xl sm:text-3xl font-bold text-slate-900 tracking-tight">
@@ -132,7 +171,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
 
           <div className="flex items-center justify-between md:justify-end gap-3 text-xs text-slate-500 font-medium">
             <span className="bg-white px-2.5 py-1 rounded-md border border-slate-200 shadow-2xs">
-              Showing <strong className="text-slate-900 font-bold">{filteredCourses.length}</strong> of <strong className="text-slate-900 font-bold">{COURSES_DATA.length}</strong> courses
+              Showing <strong className="text-slate-900 font-bold">{filteredCourses.length}</strong> of <strong className="text-slate-900 font-bold">{activeCourses.length}</strong> courses
             </span>
           </div>
         </div>
@@ -195,7 +234,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
                   onClick={() => setSelectedCategory('all')}
                   className="text-[11px] font-semibold text-blue-900 hover:text-blue-800 cursor-pointer"
                 >
-                  View All ({COURSES_DATA.length})
+                  View All ({activeCourses.length})
                 </button>
               )}
             </div>
@@ -274,7 +313,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
                 className="inline-flex items-center gap-1.5 text-blue-900 hover:text-blue-800 font-bold cursor-pointer text-xs py-1 px-2 rounded-lg hover:bg-blue-50 transition-colors"
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>Reset All ({COURSES_DATA.length})</span>
+                <span>Reset All ({activeCourses.length})</span>
               </button>
             </div>
           )}
@@ -309,7 +348,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-blue-900 hover:bg-blue-800 text-white text-xs font-semibold rounded-lg shadow-xs transition-colors cursor-pointer"
             >
               <RotateCcw className="w-3.5 h-3.5" />
-              <span>Show All {COURSES_DATA.length} Courses</span>
+              <span>Show All {activeCourses.length} Courses</span>
             </button>
           </div>
         )}

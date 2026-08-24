@@ -1,4 +1,6 @@
-import { StudentEnrollment, UserAccount, ContactInquiry } from '../types';
+import { StudentEnrollment, UserAccount, ContactInquiry, CategoryItem, Course } from '../types';
+import { getStoredCategories, setStoredCategories } from '../data/categoriesData';
+import { getStoredCourses, setStoredCourses } from '../data/coursesData';
 
 export interface DatabaseHealthResponse {
   status: string;
@@ -297,6 +299,231 @@ export const api = {
       return { success: false, error: json.error || 'Failed to send message.' };
     } catch (e: any) {
       return { success: false, error: e?.message || 'Network error sending direct message.' };
+    }
+  },
+
+  /**
+   * Assign or toggle Instructor Course Creation Privilege (Admin & Master Chancellor)
+   */
+  async setInstructorCourseCreationPermission(
+    instructorId: string,
+    canCreateCourses: boolean
+  ): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/instructors/${encodeURIComponent(instructorId)}/permission`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ canCreateCourses }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, user: json.user };
+      }
+      return { success: false, error: json.error || 'Failed to update course creation permission.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error setting instructor permission.' };
+    }
+  },
+
+  // ============================================
+  // MASTER ADMIN CATEGORIES GOVERNANCE APIS
+  // ============================================
+
+  /**
+   * Fetch all Course Categories
+   */
+  async getCategories(): Promise<{ success: boolean; categories: CategoryItem[] }> {
+    try {
+      const res = await fetch('/api/categories');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.categories && Array.isArray(json.categories)) {
+          setStoredCategories(json.categories);
+          return { success: true, categories: json.categories };
+        }
+      }
+    } catch (e) {
+      console.warn('Backend categories fetch error, using local store:', e);
+    }
+    return { success: true, categories: getStoredCategories() };
+  },
+
+  /**
+   * Create new Category (Master Admin)
+   */
+  async createCategory(data: Partial<CategoryItem>): Promise<{ success: boolean; category?: CategoryItem; error?: string }> {
+    try {
+      const res = await fetch('/api/admin/categories', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, category: json.category };
+      }
+      return { success: false, error: json.error || 'Failed to create category.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error creating category.' };
+    }
+  },
+
+  /**
+   * Modify existing Category (Master Admin)
+   */
+  async updateCategory(id: string, updates: Partial<CategoryItem>): Promise<{ success: boolean; category?: CategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, category: json.category };
+      }
+      return { success: false, error: json.error || 'Failed to update category.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error updating category.' };
+    }
+  },
+
+  /**
+   * Suspend or Activate Category (Master Admin)
+   */
+  async setCategoryStatus(id: string, status: 'active' | 'suspended'): Promise<{ success: boolean; category?: CategoryItem; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, category: json.category };
+      }
+      return { success: false, error: json.error || 'Failed to change category status.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error changing category status.' };
+    }
+  },
+
+  /**
+   * Delete Category (Master Admin)
+   */
+  async deleteCategory(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/categories/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true };
+      }
+      return { success: false, error: json.error || 'Failed to delete category.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error deleting category.' };
+    }
+  },
+
+  // ============================================
+  // ADMIN & MASTER COURSES CURRICULUM APIS
+  // ============================================
+
+  /**
+   * Fetch all courses
+   */
+  async getCourses(): Promise<{ success: boolean; courses: Course[] }> {
+    try {
+      const res = await fetch('/api/courses');
+      if (res.ok) {
+        const json = await res.json();
+        if (json.courses && Array.isArray(json.courses)) {
+          setStoredCourses(json.courses);
+          return { success: true, courses: json.courses };
+        }
+      }
+    } catch (e) {
+      console.warn('Backend courses fetch error, using local store:', e);
+    }
+    return { success: true, courses: getStoredCourses() };
+  },
+
+  /**
+   * Create new course (Admin, Master Admin, or Authorized Instructor)
+   */
+  async createCourse(data: Partial<Course>): Promise<{ success: boolean; course?: Course; error?: string }> {
+    try {
+      const res = await fetch('/api/courses', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(data),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, course: json.course };
+      }
+      return { success: false, error: json.error || 'Failed to create course.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error creating course.' };
+    }
+  },
+
+  /**
+   * Modify existing course (Admin & Master Admin)
+   */
+  async updateCourse(id: string, updates: Partial<Course>): Promise<{ success: boolean; course?: Course; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/courses/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updates),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, course: json.course };
+      }
+      return { success: false, error: json.error || 'Failed to update course.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error updating course.' };
+    }
+  },
+
+  /**
+   * Suspend or Activate course (Admin & Master Admin)
+   */
+  async setCourseStatus(id: string, status: 'active' | 'suspended' | 'draft'): Promise<{ success: boolean; course?: Course; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/courses/${encodeURIComponent(id)}/status`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true, course: json.course };
+      }
+      return { success: false, error: json.error || 'Failed to update course status.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error updating course status.' };
+    }
+  },
+
+  /**
+   * Delete course (Admin & Master Admin)
+   */
+  async deleteCourse(id: string): Promise<{ success: boolean; error?: string }> {
+    try {
+      const res = await fetch(`/api/admin/courses/${encodeURIComponent(id)}`, {
+        method: 'DELETE',
+      });
+      const json = await res.json();
+      if (res.ok && json.success) {
+        return { success: true };
+      }
+      return { success: false, error: json.error || 'Failed to delete course.' };
+    } catch (e: any) {
+      return { success: false, error: e?.message || 'Network error deleting course.' };
     }
   },
 };

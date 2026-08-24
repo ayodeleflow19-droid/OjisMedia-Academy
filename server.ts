@@ -466,6 +466,49 @@ async function startServer() {
     }
   });
 
+  // Assign or toggle Instructor Course Creation Privilege (Admin & Master Admin power)
+  app.patch('/api/admin/instructors/:id/permission', async (req: Request, res: Response) => {
+    try {
+      const instructorId = req.params.id;
+      const { canCreateCourses } = req.body;
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('users').updateOne(
+          { $or: [{ id: instructorId }, { identifierCode: instructorId }] },
+          { $set: { 'instructorDetails.canCreateCourses': Boolean(canCreateCourses), updatedAt: new Date() } }
+        );
+        const updated = await db.collection('users').findOne({
+          $or: [{ id: instructorId }, { identifierCode: instructorId }],
+        });
+        if (updated) {
+          const { password, ...sanitized } = updated;
+          return res.json({ success: true, user: sanitized });
+        }
+      } else {
+        const store = getMemoryStore().users;
+        const current = store.get(instructorId) || Array.from(store.values()).find((u: any) => u.id === instructorId || u.identifierCode === instructorId);
+        if (current) {
+          const updated = {
+            ...current,
+            instructorDetails: {
+              ...(current.instructorDetails || {}),
+              canCreateCourses: Boolean(canCreateCourses),
+            },
+            updatedAt: new Date(),
+          };
+          store.set(current.id, updated);
+          const { password, ...sanitized } = updated;
+          return res.json({ success: true, user: sanitized });
+        }
+      }
+
+      return res.status(404).json({ error: 'Instructor not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update instructor course creation privilege.', details: err?.message });
+    }
+  });
+
   // Send Direct Message / Alert to a specific user
   app.post('/api/admin/users/:id/message', async (req: Request, res: Response) => {
     try {
@@ -512,6 +555,305 @@ async function startServer() {
       return res.status(201).json({ success: true, message: messageDoc });
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to send message.', details: err?.message });
+    }
+  });
+
+  // ==========================================
+  // 5. MASTER ADMIN CATEGORIES GOVERNANCE APIS
+  // ==========================================
+
+  // Get all categories
+  app.get('/api/categories', async (_req: Request, res: Response) => {
+    try {
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        const categories = await db.collection('categories').find({}).toArray();
+        return res.json({ success: true, count: categories.length, categories });
+      } else {
+        const memoryCategories = Array.from(getMemoryStore().categories.values());
+        return res.json({ success: true, count: memoryCategories.length, categories: memoryCategories });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch categories.', details: err?.message });
+    }
+  });
+
+  // Create Category (Master Admin power)
+  app.post('/api/admin/categories', async (req: Request, res: Response) => {
+    try {
+      const categoryData = req.body;
+      if (!categoryData.name) {
+        return res.status(400).json({ error: 'Category name is required.' });
+      }
+
+      const cleanId = (categoryData.id || categoryData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')).toLowerCase();
+      const newCategory = {
+        ...categoryData,
+        id: cleanId,
+        shortLabel: categoryData.shortLabel || categoryData.name,
+        description: categoryData.description || '',
+        icon: categoryData.icon || 'Layers',
+        status: categoryData.status || 'active',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('categories').updateOne(
+          { id: cleanId },
+          { $set: newCategory },
+          { upsert: true }
+        );
+      } else {
+        getMemoryStore().categories.set(cleanId, newCategory);
+      }
+
+      return res.status(201).json({ success: true, category: newCategory });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to create category.', details: err?.message });
+    }
+  });
+
+  // Modify Category (Master Admin power)
+  app.put('/api/admin/categories/:id', async (req: Request, res: Response) => {
+    try {
+      const categoryId = req.params.id.toLowerCase();
+      const updates = req.body;
+      delete updates._id;
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('categories').updateOne(
+          { id: categoryId },
+          { $set: { ...updates, updatedAt: new Date().toISOString() } }
+        );
+        const updated = await db.collection('categories').findOne({ id: categoryId });
+        if (updated) return res.json({ success: true, category: updated });
+      } else {
+        const store = getMemoryStore().categories;
+        const current = store.get(categoryId);
+        if (current) {
+          const updated = { ...current, ...updates, updatedAt: new Date().toISOString() };
+          store.set(categoryId, updated);
+          return res.json({ success: true, category: updated });
+        }
+      }
+
+      return res.status(404).json({ error: 'Category not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to modify category.', details: err?.message });
+    }
+  });
+
+  // Suspend or Activate Category (Master Admin power)
+  app.patch('/api/admin/categories/:id/status', async (req: Request, res: Response) => {
+    try {
+      const categoryId = req.params.id.toLowerCase();
+      const { status } = req.body;
+
+      if (!status || (status !== 'active' && status !== 'suspended')) {
+        return res.status(400).json({ error: 'Valid status ("active" or "suspended") is required.' });
+      }
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('categories').updateOne(
+          { id: categoryId },
+          { $set: { status, updatedAt: new Date().toISOString() } }
+        );
+        const updated = await db.collection('categories').findOne({ id: categoryId });
+        if (updated) return res.json({ success: true, category: updated });
+      } else {
+        const store = getMemoryStore().categories;
+        const current = store.get(categoryId);
+        if (current) {
+          const updated = { ...current, status, updatedAt: new Date().toISOString() };
+          store.set(categoryId, updated);
+          return res.json({ success: true, category: updated });
+        }
+      }
+
+      return res.status(404).json({ error: 'Category not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update category status.', details: err?.message });
+    }
+  });
+
+  // Delete Category (Master Admin power)
+  app.delete('/api/admin/categories/:id', async (req: Request, res: Response) => {
+    try {
+      const categoryId = req.params.id.toLowerCase();
+      const { db, isFallback } = await getDatabase();
+
+      if (db && !isFallback) {
+        await db.collection('categories').deleteOne({ id: categoryId });
+      } else {
+        getMemoryStore().categories.delete(categoryId);
+      }
+
+      return res.json({ success: true, message: `Category ${categoryId} deleted successfully.` });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to delete category.', details: err?.message });
+    }
+  });
+
+  // ==========================================
+  // 6. ADMIN & MASTER COURSES CURRICULUM APIS
+  // ==========================================
+
+  // Get all courses
+  app.get('/api/courses', async (_req: Request, res: Response) => {
+    try {
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        const courses = await db.collection('courses').find({}).toArray();
+        return res.json({ success: true, count: courses.length, courses });
+      } else {
+        const memoryCourses = Array.from(getMemoryStore().courses.values());
+        return res.json({ success: true, count: memoryCourses.length, courses: memoryCourses });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to fetch courses.', details: err?.message });
+    }
+  });
+
+  // Create Course (Admin, Master Admin, or Authorized Instructor)
+  app.post('/api/courses', async (req: Request, res: Response) => {
+    try {
+      const courseData = req.body;
+      if (!courseData.title || !courseData.category) {
+        return res.status(400).json({ error: 'Course title and category are required.' });
+      }
+
+      const cleanId = (courseData.id || courseData.slug || courseData.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')).toLowerCase();
+      const newCourse = {
+        ...courseData,
+        id: cleanId,
+        slug: courseData.slug || cleanId,
+        status: courseData.status || 'active',
+        formattedPrice: courseData.formattedPrice || (courseData.price ? `₦${Number(courseData.price).toLocaleString()}` : '₦0'),
+        tools: Array.isArray(courseData.tools) ? courseData.tools : [],
+        outcomes: Array.isArray(courseData.outcomes) ? courseData.outcomes : [],
+        curriculum: Array.isArray(courseData.curriculum) ? courseData.curriculum : [],
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('courses').updateOne(
+          { id: cleanId },
+          { $set: newCourse },
+          { upsert: true }
+        );
+      } else {
+        getMemoryStore().courses.set(cleanId, newCourse);
+      }
+
+      return res.status(201).json({ success: true, course: newCourse });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to create course.', details: err?.message });
+    }
+  });
+
+  // Modify Course (Admin & Master Admin power)
+  app.put('/api/admin/courses/:id', async (req: Request, res: Response) => {
+    try {
+      const courseId = req.params.id;
+      const updates = req.body;
+      delete updates._id;
+
+      if (updates.price !== undefined && !updates.formattedPrice) {
+        updates.formattedPrice = `₦${Number(updates.price).toLocaleString()}`;
+      }
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('courses').updateOne(
+          { $or: [{ id: courseId }, { slug: courseId }] },
+          { $set: { ...updates, updatedAt: new Date().toISOString() } }
+        );
+        const updated = await db.collection('courses').findOne({
+          $or: [{ id: courseId }, { slug: courseId }],
+        });
+        if (updated) return res.json({ success: true, course: updated });
+      } else {
+        const store = getMemoryStore().courses;
+        const current = store.get(courseId) || Array.from(store.values()).find((c: any) => c.id === courseId || c.slug === courseId);
+        if (current) {
+          const updated = { ...current, ...updates, updatedAt: new Date().toISOString() };
+          store.set(current.id, updated);
+          return res.json({ success: true, course: updated });
+        }
+      }
+
+      return res.status(404).json({ error: 'Course not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update course.', details: err?.message });
+    }
+  });
+
+  // Suspend or Activate Course (Admin & Master Admin power)
+  app.patch('/api/admin/courses/:id/status', async (req: Request, res: Response) => {
+    try {
+      const courseId = req.params.id;
+      const { status } = req.body;
+
+      if (!status || (status !== 'active' && status !== 'suspended' && status !== 'draft')) {
+        return res.status(400).json({ error: 'Valid status ("active", "suspended", or "draft") is required.' });
+      }
+
+      const { db, isFallback } = await getDatabase();
+      if (db && !isFallback) {
+        await db.collection('courses').updateOne(
+          { $or: [{ id: courseId }, { slug: courseId }] },
+          { $set: { status, updatedAt: new Date().toISOString() } }
+        );
+        const updated = await db.collection('courses').findOne({
+          $or: [{ id: courseId }, { slug: courseId }],
+        });
+        if (updated) return res.json({ success: true, course: updated });
+      } else {
+        const store = getMemoryStore().courses;
+        const current = store.get(courseId) || Array.from(store.values()).find((c: any) => c.id === courseId || c.slug === courseId);
+        if (current) {
+          const updated = { ...current, status, updatedAt: new Date().toISOString() };
+          store.set(current.id, updated);
+          return res.json({ success: true, course: updated });
+        }
+      }
+
+      return res.status(404).json({ error: 'Course not found.' });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to update course status.', details: err?.message });
+    }
+  });
+
+  // Delete Course (Admin & Master Admin power)
+  app.delete('/api/admin/courses/:id', async (req: Request, res: Response) => {
+    try {
+      const courseId = req.params.id;
+      const { db, isFallback } = await getDatabase();
+
+      if (db && !isFallback) {
+        await db.collection('courses').deleteOne({
+          $or: [{ id: courseId }, { slug: courseId }],
+        });
+      } else {
+        const store = getMemoryStore().courses;
+        store.delete(courseId);
+        // Also check by slug
+        for (const [key, val] of store.entries()) {
+          if (val.slug === courseId || val.id === courseId) {
+            store.delete(key);
+          }
+        }
+      }
+
+      return res.json({ success: true, message: `Course ${courseId} deleted successfully.` });
+    } catch (err: any) {
+      return res.status(500).json({ error: 'Failed to delete course.', details: err?.message });
     }
   });
 

@@ -13,6 +13,8 @@ let lastError: string | null = null;
 const memoryStore = {
   enrollments: new Map<string, any>(),
   users: new Map<string, any>(),
+  categories: new Map<string, any>(),
+  courses: new Map<string, any>(),
   attendance: new Map<string, any>(),
   submissions: new Map<string, any>(),
   inquiries: new Map<string, any>(),
@@ -89,6 +91,6 @@ export function getDatabaseStatus() {
     connected: isConnected,
     dbName: dbName,
     lastError: lastError,
-    activeCollections: ['enrollments', 'users', 'attendance', 'submissions', 'inquiries', 'broadcasts']
+    activeCollections: ['enrollments', 'users', 'categories', 'courses', 'attendance', 'submissions', 'inquiries', 'broadcasts']
   };
 }

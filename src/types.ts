@@ -1,15 +1,24 @@
-export type CourseCategory = 
-  | 'all'
-  | 'filmmaking'
-  | 'photography'
-  | 'editing'
-  | 'design'
-  | 'content'
-  | 'motion';
+export type CourseCategory = string;
+
+export type CategoryStatus = 'active' | 'suspended';
+
+export interface CategoryItem {
+  id: string; // slug identifier e.g. 'filmmaking'
+  name: string; // e.g. 'Video & Cinematography'
+  shortLabel: string; // e.g. 'Video & Film'
+  description?: string;
+  icon: string; // 'Film', 'Camera', 'Scissors', 'Palette', 'Smartphone', 'Sparkles', 'Mic', 'Music', 'Tv', 'Layers', etc.
+  status: CategoryStatus;
+  createdAt?: string;
+  updatedAt?: string;
+  createdBy?: string;
+}
 
 export type LearningMode = 'Physical' | 'Hybrid' | 'Online';
 
 export type SkillLevel = 'Beginner' | 'Beginner → Intermediate' | 'Intermediate' | 'Intermediate → Advanced' | 'All Levels';
+
+export type CourseStatus = 'active' | 'suspended' | 'draft';
 
 export interface CourseModule {
   week: number;
@@ -21,7 +30,8 @@ export interface Course {
   id: string;
   slug: string;
   title: string;
-  category: CourseCategory;
+  category: string; // matches CategoryItem.id
+  status?: CourseStatus; // 'active' | 'suspended' | 'draft' (default 'active')
   shortDescription: string;
   fullDescription: string;
   image: string;
@@ -41,6 +51,11 @@ export interface Course {
   instructorName: string;
   instructorRole: string;
   instructorAvatar: string;
+  createdBy?: {
+    userId: string;
+    role: UserRole;
+    name: string;
+  };
 }
 
 export interface StudentEnrollment {
@@ -198,6 +213,7 @@ export interface UserAccount {
     assignedStudentsCount: number;
     rating: number;
     officeHours: string;
+    canCreateCourses?: boolean; // Granted by Admin or Master Chancellor
   };
   
   // Admin Specific
