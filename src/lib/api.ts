@@ -337,7 +337,7 @@ export const api = {
       const res = await fetch('/api/categories');
       if (res.ok) {
         const json = await res.json();
-        if (json.categories && Array.isArray(json.categories)) {
+        if (json.categories && Array.isArray(json.categories) && json.categories.length > 0) {
           setStoredCategories(json.categories);
           return { success: true, categories: json.categories };
         }
@@ -438,7 +438,7 @@ export const api = {
       const res = await fetch('/api/courses');
       if (res.ok) {
         const json = await res.json();
-        if (json.courses && Array.isArray(json.courses)) {
+        if (json.courses && Array.isArray(json.courses) && json.courses.length > 0) {
           setStoredCourses(json.courses);
           return { success: true, courses: json.courses };
         }

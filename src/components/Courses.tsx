@@ -193,7 +193,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
                 placeholder="Search courses, software (Premiere, DaVinci, FX3...), or outcomes..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full pl-10 pr-9 py-2.5 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 transition-all shadow-2xs"
+                className="w-full h-11 pl-10 pr-9 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 transition-all shadow-2xs"
               />
               {searchQuery && (
                 <button
@@ -207,12 +207,12 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
             </div>
 
             {/* Mode Select */}
-            <div className="w-full sm:w-64">
+            <div className="w-full sm:w-60 sm:flex-shrink-0">
               <div className="relative">
                 <select
                   value={selectedMode}
                   onChange={(e) => setSelectedMode(e.target.value as any)}
-                  className="w-full py-2.5 pl-3.5 pr-9 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 appearance-none cursor-pointer shadow-2xs transition-all"
+                  className="w-full h-11 py-2.5 pl-3.5 pr-9 bg-slate-50/80 hover:bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm text-slate-800 font-medium focus:outline-none focus:border-blue-900 focus:bg-white focus:ring-2 focus:ring-blue-900/10 appearance-none cursor-pointer shadow-2xs transition-all"
                 >
                   <option value="All">All Learning Modes</option>
                   <option value="Physical">Physical Studio (In-Person)</option>
@@ -224,7 +224,7 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
             </div>
           </div>
 
-          {/* Discipline Track Tabs Navigation */}
+          {/* Discipline Track Tabs Navigation - Fully wrapped & aligned without any sliding/scrollbar */}
           <div className="pt-3.5 border-t border-slate-100 space-y-2.5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-wider text-slate-700">
@@ -241,38 +241,43 @@ export const Courses: React.FC<CoursesProps> = ({ onViewCourseDetails, onEnrollC
               )}
             </div>
 
-            {/* Scrollable / Responsive Tab Rail */}
-            <div className="relative">
-              <div className="flex items-center gap-2 overflow-x-auto pb-1.5 pt-0.5 scrollbar-thin scrollbar-thumb-slate-200 scrollbar-track-transparent">
-                {categories.map((cat) => {
-                  const isActive = selectedCategory === cat.id;
-                  const IconComponent = cat.icon;
-                  
-                  return (
-                    <button
-                      key={cat.id}
-                      id={`track-tab-${cat.id}`}
-                      onClick={() => setSelectedCategory(cat.id)}
-                      className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold whitespace-nowrap transition-all cursor-pointer select-none active:scale-[0.98] flex-shrink-0 ${
-                        isActive
-                          ? 'bg-blue-900 text-white shadow-xs border border-blue-900 ring-2 ring-blue-900/10'
-                          : 'bg-slate-50 hover:bg-slate-100 text-slate-700 hover:text-slate-900 border border-slate-200/90 hover:border-slate-300'
-                      }`}
-                    >
-                      <IconComponent className={`w-4 h-4 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
-                      <span>{cat.shortLabel}</span>
-                      
-                      <span className={`text-[10px] sm:text-[11px] px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${
-                        isActive 
-                          ? 'bg-white/20 text-white' 
-                          : 'bg-white text-slate-600 border border-slate-200/80 shadow-2xs'
-                      }`}>
-                        {cat.count}
+            {/* Responsive Tabs: Structured 2-Col Grid on Mobile, Fluid Inline Pills on Tablet & Desktop */}
+            <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-2.5">
+              {categories.map((cat, idx) => {
+                const isActive = selectedCategory === cat.id;
+                const IconComponent = cat.icon;
+                const isMasterTrack = cat.id === 'all';
+                
+                return (
+                  <button
+                    key={cat.id}
+                    id={`track-tab-${cat.id}`}
+                    onClick={() => setSelectedCategory(cat.id)}
+                    className={`w-full sm:w-auto flex items-center justify-between sm:justify-start gap-2 px-3 sm:px-3.5 py-2.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold transition-all cursor-pointer select-none active:scale-[0.98] ${
+                      isMasterTrack ? 'col-span-2 sm:col-span-1' : 'col-span-1'
+                    } ${
+                      isActive
+                        ? 'bg-blue-900 text-white shadow-xs border border-blue-900 ring-2 ring-blue-900/10'
+                        : 'bg-slate-50 hover:bg-slate-100/90 text-slate-700 hover:text-slate-900 border border-slate-200/90 hover:border-slate-300'
+                    }`}
+                  >
+                    <div className="flex items-center gap-2 min-w-0">
+                      <IconComponent className={`w-3.5 h-3.5 sm:w-4 sm:h-4 flex-shrink-0 ${isActive ? 'text-blue-200' : 'text-slate-500'}`} />
+                      <span className="text-[11.5px] sm:text-xs md:text-sm truncate sm:overflow-visible sm:whitespace-nowrap font-semibold">
+                        {cat.shortLabel}
                       </span>
-                    </button>
-                  );
-                })}
-              </div>
+                    </div>
+                    
+                    <span className={`text-[10px] sm:text-[11px] px-1.5 sm:px-2 py-0.5 rounded-full font-bold flex-shrink-0 ${
+                      isActive 
+                        ? 'bg-white/20 text-white' 
+                        : 'bg-white text-slate-600 border border-slate-200/80 shadow-2xs'
+                    }`}>
+                      {cat.count}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

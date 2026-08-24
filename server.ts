@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { getDatabase, getDatabaseStatus, getMemoryStore } from './server/db';
+import { SEED_CATEGORIES, SEED_COURSES } from './server/seedData';
 
 async function startServer() {
   const app = express();
@@ -569,12 +570,20 @@ async function startServer() {
       if (db && !isFallback) {
         // Also remove design if lingering
         await db.collection('categories').deleteOne({ $or: [{ id: 'design' }, { shortLabel: 'Design & UI' }] });
-        const categories = await db.collection('categories').find({ id: { $ne: 'design' } }).toArray();
+        let categories = await db.collection('categories').find({ id: { $ne: 'design' } }).toArray();
+        if (!categories || categories.length === 0) {
+          await db.collection('categories').insertMany(SEED_CATEGORIES.map(c => ({ ...c })));
+          categories = await db.collection('categories').find({ id: { $ne: 'design' } }).toArray();
+        }
         return res.json({ success: true, count: categories.length, categories });
       } else {
         const store = getMemoryStore().categories;
         store.delete('design');
-        const memoryCategories = Array.from(store.values()).filter((c: any) => c.id !== 'design');
+        let memoryCategories = Array.from(store.values()).filter((c: any) => c.id !== 'design');
+        if (memoryCategories.length === 0) {
+          SEED_CATEGORIES.forEach(c => store.set(c.id, { ...c }));
+          memoryCategories = Array.from(store.values()).filter((c: any) => c.id !== 'design');
+        }
         return res.json({ success: true, count: memoryCategories.length, categories: memoryCategories });
       }
     } catch (err: any) {
@@ -721,7 +730,11 @@ async function startServer() {
       if (db && !isFallback) {
         // Also remove design courses if lingering
         await db.collection('courses').deleteMany({ $or: [{ category: 'design' }, { id: 'graphic-design' }, { id: 'ui-design' }] });
-        const courses = await db.collection('courses').find({ category: { $ne: 'design' } }).toArray();
+        let courses = await db.collection('courses').find({ category: { $ne: 'design' } }).toArray();
+        if (!courses || courses.length === 0) {
+          await db.collection('courses').insertMany(SEED_COURSES.map(c => ({ ...c })));
+          courses = await db.collection('courses').find({ category: { $ne: 'design' } }).toArray();
+        }
         return res.json({ success: true, count: courses.length, courses });
       } else {
         const store = getMemoryStore().courses;
@@ -732,7 +745,11 @@ async function startServer() {
             store.delete(key);
           }
         }
-        const memoryCourses = Array.from(store.values()).filter((c: any) => c.category !== 'design');
+        let memoryCourses = Array.from(store.values()).filter((c: any) => c.category !== 'design');
+        if (memoryCourses.length === 0) {
+          SEED_COURSES.forEach(c => store.set(c.id, { ...c }));
+          memoryCourses = Array.from(store.values()).filter((c: any) => c.category !== 'design');
+        }
         return res.json({ success: true, count: memoryCourses.length, courses: memoryCourses });
       }
     } catch (err: any) {

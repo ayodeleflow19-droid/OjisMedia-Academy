@@ -1,6 +1,102 @@
-import { Course } from '../types';
+export interface SeedCategory {
+  id: string;
+  name: string;
+  shortLabel: string;
+  description: string;
+  icon: string;
+  status: 'active' | 'suspended';
+  createdAt: string;
+}
 
-export const COURSES_DATA: Course[] = [
+export interface SeedCourse {
+  id: string;
+  slug: string;
+  title: string;
+  category: string;
+  popular: boolean;
+  featured: boolean;
+  shortDescription: string;
+  fullDescription: string;
+  image: string;
+  duration: string;
+  level: string;
+  mode: 'Physical' | 'Hybrid' | 'Online';
+  price: number;
+  formattedPrice: string;
+  upcomingCohort: string;
+  schedule: string;
+  tools: string[];
+  prerequisites: string;
+  outcomes: string[];
+  curriculum: Array<{
+    week: number;
+    title: string;
+    topics: string[];
+  }>;
+  instructorName: string;
+  instructorRole: string;
+  instructorAvatar: string;
+  status: 'active' | 'suspended';
+}
+
+export const SEED_CATEGORIES: SeedCategory[] = [
+  {
+    id: 'filmmaking',
+    name: 'Video Production & Cinematography',
+    shortLabel: 'Video & Film',
+    description: 'Master camera rigs, cinematic 3-point lighting, narrative directing & real-world set execution.',
+    icon: 'Film',
+    status: 'active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+  {
+    id: 'photography',
+    name: 'Professional Photography & Studio Lighting',
+    shortLabel: 'Photography',
+    description: 'Studio strobe lighting, editorial portraiture, fashion shoots, documentary & Adobe Lightroom retouching.',
+    icon: 'Camera',
+    status: 'active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+  {
+    id: 'editing',
+    name: 'Video Editing & Color Grading Mastery',
+    shortLabel: 'Video Editing',
+    description: 'Premiere Pro & DaVinci Resolve workflows, pacing, multi-cam assembly, audio sweetening & cinematic color science.',
+    icon: 'Scissors',
+    status: 'active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+  {
+    id: 'content',
+    name: 'Content Creation & Digital Media Strategy',
+    shortLabel: 'Content Creation',
+    description: 'Short-form viral content (Reels/TikTok/Shorts), storytelling, YouTube channel growth & personal branding.',
+    icon: 'Smartphone',
+    status: 'active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+  {
+    id: 'motion',
+    name: 'Motion Graphics & Visual Effects (VFX)',
+    shortLabel: 'Motion Graphics',
+    description: 'Adobe After Effects motion design, title animations, 3D elements, logo stings, and broadcast packaging.',
+    icon: 'Sparkles',
+    status: 'active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+  {
+    id: 'audio',
+    name: 'Audio Engineering & Podcast Production',
+    shortLabel: 'Audio & Podcast',
+    description: 'Studio microphone techniques, live broadcast switching, Rodecaster console engineering & podcast syndication.',
+    icon: 'Mic',
+    status: 'active',
+    createdAt: '2026-01-15T00:00:00.000Z',
+  },
+];
+
+export const SEED_COURSES: SeedCourse[] = [
   {
     id: 'video-production',
     slug: 'video-production',
@@ -20,6 +116,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Mondays & Wednesdays (10:00 AM - 2:00 PM) or Weekend Cohort (Saturdays 9:00 AM - 4:00 PM)',
     tools: ['Sony FX3 / FX6 Cinema Rigs', 'Aputure & Godox Studio Lighting', 'Wireless Rode / Sennheiser Audio', 'Gimbals & Fluid Heads', 'Directing Call Sheets'],
     prerequisites: 'No prior camera experience required. Passion for visual storytelling and enthusiasm to work in physical production crews.',
+    status: 'active',
     outcomes: [
       'Operate professional mirrorless and cinema camera systems with manual exposure control',
       'Design cinematic 3-point and creative colored lighting setups for interviews, music videos, and narrative scenes',
@@ -92,6 +189,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Tuesdays & Thursdays (11:00 AM - 2:00 PM) + Saturday Studio Practicals',
     tools: ['DSLR & Mirrorless Cameras', 'Godox Studio Strobes & Softboxes', 'Beauty Dishes & C-Stands', 'Adobe Lightroom Classic', 'Adobe Photoshop'],
     prerequisites: 'Open to beginners. You can use academy studio cameras during practicals; having your own camera is a plus but not mandatory.',
+    status: 'active',
     outcomes: [
       'Shoot in full Manual (M) mode with absolute confidence in any lighting situation',
       'Sculpt light using softboxes, umbrellas, grids, and reflectors for dramatic portraiture',
@@ -154,6 +252,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Mondays & Wednesdays (4:00 PM - 7:00 PM) or Weekend Cohort',
     tools: ['Adobe Premiere Pro', 'DaVinci Resolve Studio', 'Frame.io', 'CapCut Pro Desktop', 'Audition / Fairlight'],
     prerequisites: 'Basic computer literacy. Laptop capable of running video editing software (or access to Academy PC editing suites).',
+    status: 'active',
     outcomes: [
       'Master professional non-linear timeline editing shortcuts and rapid assembly workflows',
       'Cut for emotion, tempo, pacing, and retention across social, commercial, and narrative edits',
@@ -216,6 +315,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Mondays & Thursdays (6:30 PM - 8:30 PM) + Live Weekend Q&As',
     tools: ['Smartphone Filmmaking Rig', 'CapCut & Premiere Rush', 'Canva Pro & Notion', 'Wireless Smartphone Mics', 'Meta Business Suite & TikTok Creator Studio'],
     prerequisites: 'A smartphone (iOS or Android) and enthusiasm to create on-camera or faceless content.',
+    status: 'active',
     outcomes: [
       'Develop an endless content ideation engine tailored to your niche',
       'Shoot studio-quality video with just your smartphone and affordable accessories',
@@ -268,6 +368,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Wednesdays & Fridays (4:00 PM - 7:00 PM) + Studio lab',
     tools: ['Adobe After Effects', 'Adobe Illustrator', 'Maxon Cinema 4D Lite', 'Overlord & EaseCopy Plugins'],
     prerequisites: 'Basic familiarity with graphic design or video editing concepts.',
+    status: 'active',
     outcomes: [
       'Master keyframing, velocity curves, and graph editor for organic physics-based animation',
       'Create energetic kinetic typography and broadcast lower thirds',
@@ -340,6 +441,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Mondays & Wednesdays (2:00 PM - 5:00 PM)',
     tools: ['Shure SM7B & Rode PodMic', 'Focusrite Scarlett & Rodecaster Pro', 'Adobe Audition / Pro Tools', 'iZotope RX Audio Repair'],
     prerequisites: 'No prior sound engineering experience needed.',
+    status: 'active',
     outcomes: [
       'Set up and operate multi-host podcast recording studios with zero feedback or noise',
       'Clean muddy, noisy, or echoey voice tracks using industry spectral repair tools',
@@ -391,6 +493,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Fridays & Saturdays (Outdoor flight practicals)',
     tools: ['DJI Air 3 & Mavic 3 Pro Drones', 'DJI RC 2 Controllers', 'Freewell ND/PL Filters', 'Drone Flight Safety Checklists'],
     prerequisites: 'Open to all students. Academy provides training drones during outdoor sessions.',
+    status: 'active',
     outcomes: [
       'Fly drones with steady, cinematic manual control in varied weather conditions',
       'Execute signature Hollywood aerial maneuvers (dronie, pedestal reveal, orbit)',
@@ -437,6 +540,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Tuesdays & Thursdays (5:00 PM - 8:00 PM) + Studio lab',
     tools: ['DaVinci Resolve Studio 19', 'DaVinci Micro Panel', 'Calibrated OLED Reference Monitors', 'X-Rite Color Checkers'],
     prerequisites: 'Basic knowledge of video editing. Understanding of video formats and timeline basics.',
+    status: 'active',
     outcomes: [
       'Master DaVinci Resolve node tree architecture (serial, parallel, layer, and compound nodes)',
       'Balance shots effortlessly across different camera brands and mixed lighting setups',
@@ -494,6 +598,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Fridays & Saturdays (Live street photowalks & events)',
     tools: ['Mirrorless / DSLR 35mm & 50mm Prime Lenses', 'On-Camera Speedlights', 'Lightroom Mobile & Desktop', 'Photo Essay Curation Sheets'],
     prerequisites: 'Basic understanding of camera shutter, aperture, and ISO.',
+    status: 'active',
     outcomes: [
       'Anticipate candid moments and capture fast-moving subjects with tack-sharp focus',
       'Master bounced and direct flash for high-energy concert and wedding environments',
@@ -545,6 +650,7 @@ export const COURSES_DATA: Course[] = [
     schedule: 'Tuesdays & Thursdays (3:00 PM - 6:00 PM) + Studio recording session',
     tools: ['Blackmagic ATEM Mini Pro', 'Sony FX3 Multi-Cam Setup', 'Rodecaster Pro II Audio Console', 'OBS Studio / vMix', 'Riverside.fm / Descript'],
     prerequisites: 'No previous broadcasting experience required.',
+    status: 'active',
     outcomes: [
       'Design and light a multi-host podcast studio with ambient RGB and warm key lighting',
       'Operate multi-camera video switchers for live cutting and instant recording',
@@ -578,170 +684,3 @@ export const COURSES_DATA: Course[] = [
     instructorAvatar: 'https://images.unsplash.com/photo-1522529599102-193c0d76b5b6?auto=format&fit=crop&w=400&q=80'
   }
 ];
-
-export const COURSES_STORAGE_KEY = 'ojis_media_courses';
-export const COURSES_UPDATED_EVENT = 'ojis_courses_updated';
-
-/**
- * Retrieve all courses from localStorage or default seed
- */
-export function getStoredCourses(): Course[] {
-  try {
-    const raw = localStorage.getItem(COURSES_STORAGE_KEY);
-    if (raw) {
-      const parsed = JSON.parse(raw);
-      if (Array.isArray(parsed) && parsed.length > 0) {
-        // Strip out deprecated design courses if previously in localStorage
-        const cleaned = parsed
-          .filter((c: any) => c.category !== 'design' && c.id !== 'graphic-design' && c.id !== 'ui-design')
-          .map((c: any) => {
-            if (c.id === 'podcast-production' || c.id === 'sound-design') {
-              return { ...c, category: 'audio' };
-            }
-            return c;
-          });
-        
-        if (cleaned.length > 0) {
-          if (cleaned.length !== parsed.length || JSON.stringify(cleaned) !== raw) {
-            setStoredCourses(cleaned);
-          }
-          return cleaned.map((c) => ({
-            ...c,
-            status: c.status || 'active',
-          }));
-        }
-      }
-    }
-  } catch (err) {
-    console.error('Error reading courses from localStorage:', err);
-  }
-
-  // Seed default courses
-  const initial = COURSES_DATA.map((c) => ({
-    ...c,
-    status: c.status || 'active',
-  }));
-  setStoredCourses(initial);
-  return initial;
-}
-
-/**
- * Save courses to localStorage and broadcast event
- */
-export function setStoredCourses(courses: Course[]): void {
-  try {
-    // If empty array is passed, fallback to default seed courses to prevent blank home page
-    const coursesToSave = Array.isArray(courses) && courses.length > 0 
-      ? courses 
-      : COURSES_DATA.map(c => ({ ...c, status: c.status || 'active' }));
-      
-    localStorage.setItem(COURSES_STORAGE_KEY, JSON.stringify(coursesToSave));
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(COURSES_UPDATED_EVENT, { detail: coursesToSave }));
-    }
-  } catch (err) {
-    console.error('Error saving courses to localStorage:', err);
-  }
-}
-
-/**
- * Get single course by id or slug
- */
-export function getCourseById(idOrSlug: string): Course | undefined {
-  const all = getStoredCourses();
-  return all.find(
-    (c) => c.id.toLowerCase() === idOrSlug.toLowerCase() || c.slug.toLowerCase() === idOrSlug.toLowerCase()
-  );
-}
-
-/**
- * Create a new Course (Admin / Master Admin / Authorized Instructor power)
- */
-export function createStoredCourse(course: Course): Course {
-  const all = getStoredCourses();
-  
-  const cleanId = (course.id || course.slug || course.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')).toLowerCase();
-  
-  const newCourse: Course = {
-    ...course,
-    id: cleanId,
-    slug: course.slug || cleanId,
-    status: course.status || 'active',
-    formattedPrice: course.formattedPrice || `₦${(course.price || 0).toLocaleString()}`,
-    tools: Array.isArray(course.tools) ? course.tools : [],
-    outcomes: Array.isArray(course.outcomes) ? course.outcomes : [],
-    curriculum: Array.isArray(course.curriculum) ? course.curriculum : [],
-  };
-
-  const existingIndex = all.findIndex((c) => c.id === cleanId || c.slug === cleanId);
-  if (existingIndex >= 0) {
-    all[existingIndex] = newCourse;
-  } else {
-    all.unshift(newCourse); // Place new courses at the beginning
-  }
-
-  setStoredCourses(all);
-  return newCourse;
-}
-
-/**
- * Update an existing Course (Admin & Master Admin power)
- */
-export function updateStoredCourse(id: string, updates: Partial<Course>): Course | null {
-  const all = getStoredCourses();
-  const index = all.findIndex((c) => c.id.toLowerCase() === id.toLowerCase() || c.slug.toLowerCase() === id.toLowerCase());
-  
-  if (index === -1) return null;
-
-  const current = all[index];
-  const updatedPrice = updates.price !== undefined ? updates.price : current.price;
-  const updatedFormattedPrice = updates.formattedPrice || (updates.price !== undefined ? `₦${updates.price.toLocaleString()}` : current.formattedPrice);
-
-  const updated: Course = {
-    ...current,
-    ...updates,
-    price: updatedPrice,
-    formattedPrice: updatedFormattedPrice,
-  };
-
-  all[index] = updated;
-  setStoredCourses(all);
-  return updated;
-}
-
-/**
- * Suspend or Activate a Course (Admin & Master Admin power)
- */
-export function setCourseStatus(id: string, status: 'active' | 'suspended' | 'draft'): Course | null {
-  return updateStoredCourse(id, { status });
-}
-
-/**
- * Delete a Course (Admin & Master Admin power)
- */
-export function deleteStoredCourse(id: string): boolean {
-  const all = getStoredCourses();
-  const filtered = all.filter((c) => c.id.toLowerCase() !== id.toLowerCase() && c.slug.toLowerCase() !== id.toLowerCase());
-  
-  if (filtered.length !== all.length) {
-    setStoredCourses(filtered);
-    return true;
-  }
-  return false;
-}
-
-/**
- * Delete all courses under a specific category
- */
-export function deleteStoredCoursesByCategory(categoryId: string): number {
-  const all = getStoredCourses();
-  const targetCategory = categoryId.toLowerCase();
-  const filtered = all.filter((c) => c.category.toLowerCase() !== targetCategory);
-  
-  const countRemoved = all.length - filtered.length;
-  if (countRemoved > 0) {
-    setStoredCourses(filtered);
-  }
-  return countRemoved;
-}
-

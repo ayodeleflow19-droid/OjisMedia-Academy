@@ -92,9 +92,12 @@ export function getStoredCategories(): CategoryItem[] {
  */
 export function setStoredCategories(categories: CategoryItem[]): void {
   try {
-    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categories));
+    const categoriesToSave = Array.isArray(categories) && categories.length > 0
+      ? categories
+      : INITIAL_CATEGORIES;
+    localStorage.setItem(CATEGORIES_STORAGE_KEY, JSON.stringify(categoriesToSave));
     if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent(CATEGORIES_UPDATED_EVENT, { detail: categories }));
+      window.dispatchEvent(new CustomEvent(CATEGORIES_UPDATED_EVENT, { detail: categoriesToSave }));
     }
   } catch (err) {
     console.error('Error saving categories to localStorage:', err);

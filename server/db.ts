@@ -1,4 +1,5 @@
 import { MongoClient, Db } from 'mongodb';
+import { SEED_CATEGORIES, SEED_COURSES } from './seedData';
 
 const uri = process.env.MONGODB_URI;
 const dbName = process.env.MONGODB_DB_NAME || 'ojis_media_academy';
@@ -8,12 +9,24 @@ let dbInstance: Db | null = null;
 let isConnected = false;
 let lastError: string | null = null;
 
+// Initialize categories map with default seed
+const initialCategoriesMap = new Map<string, any>();
+SEED_CATEGORIES.forEach((cat) => {
+  initialCategoriesMap.set(cat.id, { ...cat });
+});
+
+// Initialize courses map with default seed
+const initialCoursesMap = new Map<string, any>();
+SEED_COURSES.forEach((course) => {
+  initialCoursesMap.set(course.id, { ...course });
+});
+
 // In-memory fallback stores when MONGODB_URI is not yet provided or in offline mode
 const memoryStore = {
   enrollments: new Map<string, any>(),
   users: new Map<string, any>(),
-  categories: new Map<string, any>(),
-  courses: new Map<string, any>(),
+  categories: initialCategoriesMap,
+  courses: initialCoursesMap,
   attendance: new Map<string, any>(),
   submissions: new Map<string, any>(),
   inquiries: new Map<string, any>(),
@@ -23,6 +36,27 @@ const memoryStore = {
 
 let lastAttemptTime = 0;
 const RETRY_INTERVAL_MS = 60000; // 1 minute backoff on connection failures
+
+/**
+ * Seed initial categories and courses into MongoDB if collections are empty
+ */
+async function seedMongoIfEmpty(db: Db) {
+  try {
+    const categoriesCount = await db.collection('categories').countDocuments({});
+    if (categoriesCount === 0) {
+      await db.collection('categories').insertMany(SEED_CATEGORIES.map(c => ({ ...c })));
+      console.log(`[MongoDB] Seeded ${SEED_CATEGORIES.length} default categories.`);
+    }
+
+    const coursesCount = await db.collection('courses').countDocuments({});
+    if (coursesCount === 0) {
+      await db.collection('courses').insertMany(SEED_COURSES.map(c => ({ ...c })));
+      console.log(`[MongoDB] Seeded ${SEED_COURSES.length} default courses.`);
+    }
+  } catch (seedErr) {
+    console.warn('[MongoDB] Notice during initial collection seeding:', seedErr);
+  }
+}
 
 /**
  * Format MongoDB error messages to be clean and informative
@@ -83,6 +117,9 @@ export async function getDatabase(): Promise<{ db: Db | null; isConnected: boole
     isConnected = true;
     lastError = null;
     console.log(`[MongoDB] Successfully connected to database: "${dbName}"`);
+
+    // Ensure initial categories and courses exist in DB
+    await seedMongoIfEmpty(dbInstance);
 
     return { db: dbInstance, isConnected: true, isFallback: false };
   } catch (error: any) {
