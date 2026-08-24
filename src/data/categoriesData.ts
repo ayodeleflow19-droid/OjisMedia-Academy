@@ -1,4 +1,5 @@
 import { CategoryItem } from '../types';
+import { deleteStoredCoursesByCategory } from './coursesData';
 
 export const CATEGORIES_STORAGE_KEY = 'ojis_media_categories';
 export const CATEGORIES_UPDATED_EVENT = 'ojis_categories_updated';
@@ -28,15 +29,6 @@ export const INITIAL_CATEGORIES: CategoryItem[] = [
     shortLabel: 'Video Editing',
     description: 'Premiere Pro & DaVinci Resolve workflows, pacing, multi-cam assembly, audio sweetening & cinematic color science.',
     icon: 'Scissors',
-    status: 'active',
-    createdAt: '2026-01-15T00:00:00.000Z',
-  },
-  {
-    id: 'design',
-    name: 'Graphic Design & UI/UX Product Design',
-    shortLabel: 'Design & UI',
-    description: 'Brand identity systems, typography, Figma UI/UX prototyping, visual hierarchy & design system creation.',
-    icon: 'Palette',
     status: 'active',
     createdAt: '2026-01-15T00:00:00.000Z',
   },
@@ -78,7 +70,12 @@ export function getStoredCategories(): CategoryItem[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed;
+        // Filter out any deprecated 'design' category
+        const cleaned = parsed.filter((c: any) => c.id !== 'design' && c.shortLabel !== 'Design & UI');
+        if (cleaned.length !== parsed.length) {
+          setStoredCategories(cleaned);
+        }
+        return cleaned;
       }
     }
   } catch (err) {
@@ -172,10 +169,13 @@ export function setCategoryStatus(id: string, status: 'active' | 'suspended'): C
  */
 export function deleteStoredCategory(id: string): boolean {
   const all = getStoredCategories();
-  const filtered = all.filter((c) => c.id.toLowerCase() !== id.toLowerCase());
+  const targetId = id.toLowerCase();
+  const filtered = all.filter((c) => c.id.toLowerCase() !== targetId);
   
   if (filtered.length !== all.length) {
     setStoredCategories(filtered);
+    // Also delete any courses that belonged to this category
+    deleteStoredCoursesByCategory(targetId);
     return true;
   }
   return false;

@@ -198,68 +198,6 @@ export const COURSES_DATA: Course[] = [
     instructorAvatar: 'https://images.unsplash.com/photo-1534751516642-a171edd2521d?auto=format&fit=crop&w=400&q=80'
   },
   {
-    id: 'graphic-design',
-    slug: 'graphic-design',
-    title: 'Graphic Design & Brand Identity Systems',
-    category: 'design',
-    popular: false,
-    featured: false,
-    shortDescription: 'Master Adobe Photoshop, Illustrator, typography, color theory, visual hierarchy, and high-impact brand identities.',
-    fullDescription: 'Learn to think and create like a senior brand designer. You will master the fundamentals of layout design, typography pairing, logo creation, packaging, and digital marketing graphics that capture attention and build commercial brands.',
-    image: 'https://images.unsplash.com/photo-1626785774573-4b799315345d?auto=format&fit=crop&w=1000&q=80',
-    duration: '6 Weeks',
-    level: 'Beginner → Intermediate',
-    mode: 'Hybrid',
-    price: 85000,
-    formattedPrice: '₦85,000',
-    upcomingCohort: 'April 20, 2026',
-    schedule: 'Tuesdays & Thursdays (3:00 PM - 6:00 PM) + Virtual labs',
-    tools: ['Adobe Illustrator', 'Adobe Photoshop', 'Figma for Graphic Design', 'Adobe InDesign'],
-    prerequisites: 'Basic computer literacy. No previous design drawing skill required.',
-    outcomes: [
-      'Master the Pen tool, vector geometry, and shape construction in Illustrator',
-      'Create memorable logos, brand identity guides, and typography systems',
-      'Design high-converting social media carousels, event flyers, and banner campaigns',
-      'Prepare print-ready assets with proper bleed, CMYK separations, and vector exports',
-      'Assemble a Behance & Dribbble case study ready for client pitches'
-    ],
-    curriculum: [
-      {
-        week: 1,
-        title: 'Design Foundations, Typography & Color Theory',
-        topics: ['Contrast, hierarchy, balance, proximity, and whitespace discipline', 'Type anatomy, serif vs. sans-serif pairing, and psychological color palettes']
-      },
-      {
-        week: 2,
-        title: 'Adobe Illustrator & Vector Mastery',
-        topics: ['Pen tool precision, Pathfinder, shape builder, and custom iconography', 'Creating clean scalable vector illustrations']
-      },
-      {
-        week: 3,
-        title: 'Logo Design & Brand Identity Systems',
-        topics: ['Wordmarks, lettermarks, emblem logos and brand discovery', 'Color codes (HEX, RGB, CMYK, Pantone) and brand guideline books']
-      },
-      {
-        week: 4,
-        title: 'Adobe Photoshop & Photo Manipulation',
-        topics: ['Layer masks, clipping masks, blend modes, and composite art', 'Subject isolation, realistic shadows, and lighting effects for flyers']
-      },
-      {
-        week: 5,
-        title: 'Marketing Collateral & Packaging Design',
-        topics: ['Multi-page carousels, billboard layouts, packaging mockups, and merch design', 'Print production specifications and 3D mockups']
-      },
-      {
-        week: 6,
-        title: 'Portfolio Presentation & Freelance Onboarding',
-        topics: ['Documenting your design process into engaging case studies', 'Pricing your design services, contracts, and proposal pitching']
-      }
-    ],
-    instructorName: 'Fatima Bello',
-    instructorRole: 'Creative Director & Brand Strategist',
-    instructorAvatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=400&q=80'
-  },
-  {
     id: 'content-creation',
     slug: 'content-creation',
     title: 'Social Media Content Creation & Digital Growth',
@@ -589,77 +527,6 @@ export const COURSES_DATA: Course[] = [
     instructorAvatar: 'https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?auto=format&fit=crop&w=400&q=80'
   },
   {
-    id: 'ui-design',
-    slug: 'ui-design',
-    title: 'UI/UX Design & Digital Product Systems (Figma)',
-    category: 'design',
-    popular: true,
-    featured: true,
-    shortDescription: 'Master Figma: wireframing, design systems, auto-layout, interactive prototypes, and client case studies.',
-    fullDescription: 'Bridge visual creativity with high-paying digital tech. Master modern UI/UX design from scratch: user journey mapping, design systems, typography hierarchy, mobile app interfaces, responsive landing pages, and interactive Figma prototyping.',
-    image: 'https://images.unsplash.com/photo-1581291518857-4e27b48ff24e?auto=format&fit=crop&w=1000&q=80',
-    duration: '8 Weeks',
-    level: 'Beginner → Intermediate',
-    mode: 'Online',
-    price: 115000,
-    formattedPrice: '₦115,000',
-    upcomingCohort: 'April 6, 2026',
-    schedule: 'Mondays & Thursdays (6:00 PM - 8:30 PM) + Weekend Design Critique',
-    tools: ['Figma Professional', 'FigJam for UX Mapping', 'Framer / Webflow Basics', 'Design System Tokens'],
-    prerequisites: 'Basic computer literacy. Enthusiasm to design functional, beautiful mobile apps and web platforms.',
-    outcomes: [
-      'Build scalable Design Systems in Figma with Auto-Layout, Component Variants & Tokens',
-      'Design modern, high-converting mobile app interfaces and responsive web layouts',
-      'Create realistic animated interactive prototypes for client presentations and user testing',
-      'Document end-to-end UX case studies that attract international product design roles'
-    ],
-    curriculum: [
-      {
-        week: 1,
-        title: 'UX Research & User Journey Mapping',
-        topics: ['User personas, problem framing, competitive audits, and FigJam information architecture']
-      },
-      {
-        week: 2,
-        title: 'Wireframing & Low-Fidelity Layouts',
-        topics: ['Typography hierarchy, 8pt spatial grid system, wireframing rapid sketches']
-      },
-      {
-        week: 3,
-        title: 'Figma Auto-Layout & Component Mastery',
-        topics: ['Nested auto-layouts, responsive constraints, variant properties, and boolean flags']
-      },
-      {
-        week: 4,
-        title: 'Design Systems & UI Kit Architecture',
-        topics: ['Color palettes, typography tokens, button states, input fields, and icon libraries']
-      },
-      {
-        week: 5,
-        title: 'Mobile App Interface Design (iOS & Android)',
-        topics: ['Native design guidelines (Human Interface Guidelines & Material You), bottom sheets, navigation bars']
-      },
-      {
-        week: 6,
-        title: 'Web & Landing Page Responsive Systems',
-        topics: ['Desktop, tablet, and mobile viewport adaptations, visual hierarchy, conversion optimization']
-      },
-      {
-        week: 7,
-        title: 'Advanced Interactive Prototyping & Micro-Interactions',
-        topics: ['Smart animate transitions, scroll behaviors, interactive component states, prototype demos']
-      },
-      {
-        week: 8,
-        title: 'Case Study Documentation & Design Handoff',
-        topics: ['Developer handoff specs, Behance case study formatting, portfolio review & job strategy']
-      }
-    ],
-    instructorName: 'Fatima Bello',
-    instructorRole: 'Lead Product Designer & Brand Strategist',
-    instructorAvatar: 'https://images.unsplash.com/photo-1567532939604-b6b5b0db2604?auto=format&fit=crop&w=400&q=80'
-  },
-  {
     id: 'podcast-production',
     slug: 'podcast-production',
     title: 'Podcast Studio Setup & Live Broadcasting',
@@ -724,7 +591,14 @@ export function getStoredCourses(): Course[] {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (Array.isArray(parsed) && parsed.length > 0) {
-        return parsed.map((c) => ({
+        // Strip out deprecated design courses if previously in localStorage
+        const cleaned = parsed.filter(
+          (c: any) => c.category !== 'design' && c.id !== 'graphic-design' && c.id !== 'ui-design'
+        );
+        if (cleaned.length !== parsed.length) {
+          setStoredCourses(cleaned);
+        }
+        return cleaned.map((c) => ({
           ...c,
           status: c.status || 'active',
         }));
@@ -841,5 +715,20 @@ export function deleteStoredCourse(id: string): boolean {
     return true;
   }
   return false;
+}
+
+/**
+ * Delete all courses under a specific category
+ */
+export function deleteStoredCoursesByCategory(categoryId: string): number {
+  const all = getStoredCourses();
+  const targetCategory = categoryId.toLowerCase();
+  const filtered = all.filter((c) => c.category.toLowerCase() !== targetCategory);
+  
+  const countRemoved = all.length - filtered.length;
+  if (countRemoved > 0) {
+    setStoredCourses(filtered);
+  }
+  return countRemoved;
 }
 

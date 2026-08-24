@@ -567,10 +567,14 @@ async function startServer() {
     try {
       const { db, isFallback } = await getDatabase();
       if (db && !isFallback) {
-        const categories = await db.collection('categories').find({}).toArray();
+        // Also remove design if lingering
+        await db.collection('categories').deleteOne({ $or: [{ id: 'design' }, { shortLabel: 'Design & UI' }] });
+        const categories = await db.collection('categories').find({ id: { $ne: 'design' } }).toArray();
         return res.json({ success: true, count: categories.length, categories });
       } else {
-        const memoryCategories = Array.from(getMemoryStore().categories.values());
+        const store = getMemoryStore().categories;
+        store.delete('design');
+        const memoryCategories = Array.from(store.values()).filter((c: any) => c.id !== 'design');
         return res.json({ success: true, count: memoryCategories.length, categories: memoryCategories });
       }
     } catch (err: any) {
@@ -688,11 +692,19 @@ async function startServer() {
 
       if (db && !isFallback) {
         await db.collection('categories').deleteOne({ id: categoryId });
+        // Cascade delete courses under this category
+        await db.collection('courses').deleteMany({ category: categoryId });
       } else {
         getMemoryStore().categories.delete(categoryId);
+        const courseStore = getMemoryStore().courses;
+        for (const [key, val] of courseStore.entries()) {
+          if (val.category?.toLowerCase() === categoryId) {
+            courseStore.delete(key);
+          }
+        }
       }
 
-      return res.json({ success: true, message: `Category ${categoryId} deleted successfully.` });
+      return res.json({ success: true, message: `Category ${categoryId} and its associated courses deleted successfully.` });
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to delete category.', details: err?.message });
     }
@@ -707,10 +719,20 @@ async function startServer() {
     try {
       const { db, isFallback } = await getDatabase();
       if (db && !isFallback) {
-        const courses = await db.collection('courses').find({}).toArray();
+        // Also remove design courses if lingering
+        await db.collection('courses').deleteMany({ $or: [{ category: 'design' }, { id: 'graphic-design' }, { id: 'ui-design' }] });
+        const courses = await db.collection('courses').find({ category: { $ne: 'design' } }).toArray();
         return res.json({ success: true, count: courses.length, courses });
       } else {
-        const memoryCourses = Array.from(getMemoryStore().courses.values());
+        const store = getMemoryStore().courses;
+        store.delete('graphic-design');
+        store.delete('ui-design');
+        for (const [key, val] of store.entries()) {
+          if (val.category === 'design' || val.id === 'graphic-design' || val.id === 'ui-design') {
+            store.delete(key);
+          }
+        }
+        const memoryCourses = Array.from(store.values()).filter((c: any) => c.category !== 'design');
         return res.json({ success: true, count: memoryCourses.length, courses: memoryCourses });
       }
     } catch (err: any) {
