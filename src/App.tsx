@@ -18,6 +18,7 @@ import { EnrollmentModal } from './components/EnrollmentModal';
 import { MyRegistrationsModal } from './components/MyRegistrationsModal';
 import { AuthModal } from './components/AuthModal';
 import { PortalModal } from './components/PortalModal';
+import { WebmailModal } from './components/WebmailModal';
 import { Course, StudentEnrollment, UserAccount, UserRole, AuthMode } from './types';
 import { getStoredUser, setStoredUser, clearStoredUser } from './data/authDemoData';
 import { api } from './lib/api';
@@ -37,6 +38,7 @@ export default function App() {
   const [authInitialRole, setAuthInitialRole] = useState<UserRole>('student');
   const [authInitialMode, setAuthInitialMode] = useState<AuthMode>('login');
   const [isPortalModalOpen, setIsPortalModalOpen] = useState(false);
+  const [isWebmailOpen, setIsWebmailOpen] = useState(false);
   
   // Notification Toast for recent actions
   const [toastMessage, setToastMessage] = useState<string | null>(null);
@@ -61,14 +63,15 @@ export default function App() {
       setCurrentUser(existingUser);
     }
 
-    // Check for email activation token in URL query
+    // Check for email activation token/code in URL query
     const params = new URLSearchParams(window.location.search);
     const token = params.get('token');
+    const code = params.get('code');
     const email = params.get('email');
-    const isActivatePath = window.location.pathname.includes('/activate') || params.has('activate') || !!token;
+    const isActivatePath = window.location.pathname.includes('/activate') || params.has('activate') || !!token || !!code;
 
-    if (token || (isActivatePath && email)) {
-      api.activateAccount(token || undefined, email || undefined).then((res) => {
+    if (token || code || (isActivatePath && email)) {
+      api.activateAccount(token || undefined, email || undefined, code || undefined).then((res) => {
         if (res.success && res.user) {
           setCurrentUser(res.user);
           setStoredUser(res.user);
@@ -170,6 +173,7 @@ export default function App() {
         onOpenAuth={handleOpenAuth}
         onOpenPortal={() => setIsPortalModalOpen(true)}
         onLogout={handleLogout}
+        onOpenWebmail={() => setIsWebmailOpen(true)}
       />
 
       {/* Hero Section */}
@@ -287,6 +291,22 @@ export default function App() {
         user={currentUser}
         onLogout={handleLogout}
         onSwitchRole={handleSwitchRole}
+      />
+
+      {/* 6. Academy Webmail & Activation Inbox Modal */}
+      <WebmailModal
+        isOpen={isWebmailOpen}
+        onClose={() => setIsWebmailOpen(false)}
+        filterEmail={currentUser?.email || ''}
+        onActivateFromEmail={async (code, token, email) => {
+          const res = await api.activateAccount(token, email, code);
+          if (res.success && res.user) {
+            setCurrentUser(res.user);
+            setStoredUser(res.user);
+            setToastMessage(`🎉 Account Verified & Activated! Welcome to OJIS Media Academy, ${res.user.name}!`);
+            setIsPortalModalOpen(true);
+          }
+        }}
       />
 
     </div>

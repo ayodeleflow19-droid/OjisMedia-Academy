@@ -878,5 +878,56 @@ export const api = {
       error: res.data?.error || res.error || 'Failed to delete course.',
     };
   },
+
+  /**
+   * Fetch delivered emails from server
+   */
+  async fetchSentEmails(email?: string): Promise<{ success: boolean; count: number; emails: any[] }> {
+    const query = email ? `?email=${encodeURIComponent(email)}` : '';
+    const res = await safeJsonFetch<{ success: boolean; count: number; emails: any[] }>(`/api/emails${query}`);
+    if (res.ok && res.data?.emails) {
+      return { success: true, count: res.data.count || res.data.emails.length, emails: res.data.emails };
+    }
+    return { success: false, count: 0, emails: [] };
+  },
+
+  /**
+   * Fetch the latest email for a specific recipient
+   */
+  async fetchLatestEmail(email?: string): Promise<{ success: boolean; email: any | null }> {
+    const query = email ? `?email=${encodeURIComponent(email)}` : '';
+    const res = await safeJsonFetch<{ success: boolean; email: any | null }>(`/api/emails/latest${query}`);
+    if (res.ok && res.data?.email) {
+      return { success: true, email: res.data.email };
+    }
+    return { success: false, email: null };
+  },
+
+  /**
+   * Get email service status
+   */
+  async getEmailServiceStatus(): Promise<{ success: boolean; emailService?: any; error?: string }> {
+    const res = await safeJsonFetch<{ success: boolean; emailService: any }>('/api/email/status');
+    if (res.ok && res.data?.emailService) {
+      return { success: true, emailService: res.data.emailService };
+    }
+    return { success: false, error: res.error || 'Failed to fetch email status' };
+  },
+
+  /**
+   * Send test email
+   */
+  async sendTestEmail(targetEmail: string): Promise<{ success: boolean; message?: string; error?: string }> {
+    const res = await safeJsonFetch<{ success: boolean; message?: string; error?: string }>('/api/email/test-send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email: targetEmail }),
+    });
+    return {
+      success: !!res.data?.success,
+      message: res.data?.message || 'Test email dispatched',
+      error: res.data?.error || res.error,
+    };
+  },
 };
 

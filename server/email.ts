@@ -66,6 +66,37 @@ export function getEmailProviderStatus(): EmailStatusResult {
   };
 }
 
+export interface SentEmailRecord {
+  id: string;
+  to: string;
+  from: string;
+  subject: string;
+  html: string;
+  activationCode: string;
+  activationUrl: string;
+  activationToken: string;
+  provider: string;
+  sentAt: string;
+  etherealUrl?: string;
+  read: boolean;
+}
+
+// In-memory Sent Emails Log
+const sentEmailsHistory: SentEmailRecord[] = [];
+
+export function getSentEmails(filterEmail?: string): SentEmailRecord[] {
+  if (!filterEmail) {
+    return [...sentEmailsHistory].reverse();
+  }
+  const clean = filterEmail.toLowerCase().trim();
+  return sentEmailsHistory.filter((e) => e.to.toLowerCase() === clean).reverse();
+}
+
+export function getLatestSentEmail(filterEmail?: string): SentEmailRecord | null {
+  const list = getSentEmails(filterEmail);
+  return list.length > 0 ? list[0] : null;
+}
+
 /**
  * Generates branded HTML for the activation email
  */
@@ -395,6 +426,22 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
       });
 
       console.log(`[Email Service] Successfully sent live Gmail activation email to ${to}! MessageId: ${info.messageId}`);
+      
+      const record: SentEmailRecord = {
+        id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        to,
+        from: user,
+        subject,
+        html: emailHtml,
+        activationCode,
+        activationUrl,
+        activationToken,
+        provider: 'gmail_smtp',
+        sentAt: new Date().toISOString(),
+        read: false,
+      };
+      sentEmailsHistory.push(record);
+
       return {
         success: true,
         provider: 'gmail_smtp',
@@ -441,6 +488,22 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
       }
 
       console.log(`[Email Service] Successfully sent via Resend API to ${to}! ID: ${res.data?.id}`);
+      
+      const record: SentEmailRecord = {
+        id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        to,
+        from: fromEmail,
+        subject,
+        html: emailHtml,
+        activationCode,
+        activationUrl,
+        activationToken,
+        provider: 'resend',
+        sentAt: new Date().toISOString(),
+        read: false,
+      };
+      sentEmailsHistory.push(record);
+
       return {
         success: true,
         provider: 'resend',
@@ -484,6 +547,22 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
       });
 
       console.log(`[Email Service] Successfully sent via Custom SMTP to ${to}! MessageId: ${info.messageId}`);
+      
+      const record: SentEmailRecord = {
+        id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+        to,
+        from: fromEmail || 'smtp@ojismedia.academy',
+        subject,
+        html: emailHtml,
+        activationCode,
+        activationUrl,
+        activationToken,
+        provider: 'custom_smtp',
+        sentAt: new Date().toISOString(),
+        read: false,
+      };
+      sentEmailsHistory.push(record);
+
       return {
         success: true,
         provider: 'custom_smtp',
@@ -504,15 +583,60 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
   }
 
   // ==========================================
-  // 4. PREVIEW / SIMULATOR MODE
+  // 4. PREVIEW / SIMULATOR / ETHEREAL MODE
   // ==========================================
-  console.log(`[Email Service - Preview Mode] Generated activation link for ${to}: ${activationUrl}`);
+  let etherealUrl: string | undefined = undefined;
+  try {
+    const testAccount = await nodemailer.createTestAccount();
+    const testTransporter = nodemailer.createTransport({
+      host: testAccount.smtp.host,
+      port: testAccount.smtp.port,
+      secure: testAccount.smtp.secure,
+      auth: {
+        user: testAccount.user,
+        pass: testAccount.pass,
+      },
+    });
+
+    const info = await testTransporter.sendMail({
+      from: '"OJIS Media Academy" <admissions@ojismedia.academy>',
+      to,
+      subject,
+      html: emailHtml,
+    });
+
+    const previewLink = nodemailer.getTestMessageUrl(info);
+    if (previewLink) {
+      etherealUrl = previewLink.toString();
+      console.log(`[Email Service] Live Ethereal Webmail created: ${etherealUrl}`);
+    }
+  } catch (err) {
+    console.log('[Email Service] Ethereal test account generation bypassed, using in-app Webmail store.');
+  }
+
+  const record: SentEmailRecord = {
+    id: `mail_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
+    to,
+    from: 'admissions@ojismedia.academy',
+    subject,
+    html: emailHtml,
+    activationCode,
+    activationUrl,
+    activationToken,
+    provider: etherealUrl ? 'ethereal_webmail' : 'academy_webmail',
+    sentAt: new Date().toISOString(),
+    etherealUrl,
+    read: false,
+  };
+  sentEmailsHistory.push(record);
+
+  console.log(`[Email Service - Webmail Dispatch] Delivered activation email to ${to}: Code [${activationCode}], Link: ${activationUrl}`);
   return {
     success: true,
-    provider: 'preview_mode',
+    provider: etherealUrl ? 'ethereal_webmail' : 'academy_webmail',
     activationUrl,
     activationCode,
-    messageId: `preview_${Date.now()}`,
+    messageId: record.id,
   };
 }
 

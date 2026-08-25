@@ -3,7 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { getDatabase, getDatabaseStatus, getMemoryStore } from './server/db';
 import { SEED_CATEGORIES, SEED_COURSES } from './server/seedData';
-import { sendActivationEmail, getEmailProviderStatus, sendTestEmail } from './server/email';
+import { sendActivationEmail, getEmailProviderStatus, sendTestEmail, getSentEmails, getLatestSentEmail } from './server/email';
 
 async function startServer() {
   const app = express();
@@ -170,6 +170,20 @@ async function startServer() {
   app.get('/api/email/status', (_req: Request, res: Response) => {
     const status = getEmailProviderStatus();
     return res.json({ success: true, emailService: status });
+  });
+
+  // Get delivered emails inbox (filtered by recipient or all)
+  app.get('/api/emails', (req: Request, res: Response) => {
+    const email = req.query.email as string;
+    const emails = getSentEmails(email);
+    return res.json({ success: true, count: emails.length, emails });
+  });
+
+  // Get latest email for a specific recipient
+  app.get('/api/emails/latest', (req: Request, res: Response) => {
+    const email = req.query.email as string;
+    const latest = getLatestSentEmail(email);
+    return res.json({ success: true, email: latest });
   });
 
   // Send diagnostic test email

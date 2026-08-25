@@ -14,7 +14,8 @@ import {
   UserPlus,
   ChevronDown,
   LogOut,
-  LayoutDashboard
+  LayoutDashboard,
+  Mail
 } from 'lucide-react';
 import { UserAccount, UserRole, AuthMode } from '../types';
 
@@ -26,6 +27,7 @@ interface NavbarProps {
   onOpenAuth: (role?: UserRole, mode?: AuthMode) => void;
   onOpenPortal: () => void;
   onLogout: () => void;
+  onOpenWebmail?: () => void;
 }
 
 export const Navbar: React.FC<NavbarProps> = ({ 
@@ -36,6 +38,7 @@ export const Navbar: React.FC<NavbarProps> = ({
   onOpenAuth,
   onOpenPortal,
   onLogout,
+  onOpenWebmail,
 }) => {
   const [isScrolled, setIsScrolled] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
@@ -103,6 +106,17 @@ export const Navbar: React.FC<NavbarProps> = ({
                 <ShieldCheck className="w-3 h-3" />
                 <span>Admin</span>
               </button>
+
+              {onOpenWebmail && (
+                <button
+                  onClick={onOpenWebmail}
+                  className="text-[11px] text-amber-300 hover:text-amber-200 font-bold flex items-center gap-1 cursor-pointer transition-colors bg-blue-900/80 hover:bg-blue-800 px-2 py-0.5 rounded border border-amber-400/40"
+                  title="View Delivered Activation Emails and Codes"
+                >
+                  <Mail className="w-3 h-3 text-amber-400" />
+                  <span>Webmail Inbox</span>
+                </button>
+              )}
             </div>
 
             <a href="tel:+2348123456789" className="hover:text-white transition-colors flex items-center gap-1">
@@ -449,6 +463,19 @@ export const Navbar: React.FC<NavbarProps> = ({
                   <ShieldCheck className="w-4 h-4 text-blue-900 mx-auto mb-1" />
                   <span className="text-[11px] font-semibold text-slate-800 block">Admin</span>
                 </button>
+
+                {onOpenWebmail && (
+                  <button
+                    onClick={() => {
+                      setIsMobileMenuOpen(false);
+                      onOpenWebmail();
+                    }}
+                    className="p-2 bg-amber-50 border border-amber-300 rounded-lg text-center cursor-pointer"
+                  >
+                    <Mail className="w-4 h-4 text-amber-700 mx-auto mb-1" />
+                    <span className="text-[11px] font-bold text-amber-900 block">Webmail</span>
+                  </button>
+                )}
               </div>
             </div>
 

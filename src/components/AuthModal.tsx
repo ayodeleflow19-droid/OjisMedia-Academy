@@ -33,6 +33,7 @@ import { UserRole, AuthMode, UserAccount, LearningMode } from '../types';
 import { COURSES_DATA } from '../data/coursesData';
 import { DEMO_ACCOUNTS, MASTER_ADMIN_ACCOUNT, MASTER_ADMIN_PIN, MASTER_ADMIN_SECURITY_CODE, setStoredUser, saveRegisteredUser } from '../data/authDemoData';
 import { api } from '../lib/api';
+import { WebmailModal } from './WebmailModal';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -101,6 +102,7 @@ export function AuthModal({
   const [resendSuccess, setResendSuccess] = useState<string | null>(null);
   const [isActivatingDirectly, setIsActivatingDirectly] = useState(false);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [isWebmailOpen, setIsWebmailOpen] = useState(false);
 
   useEffect(() => {
     if (isOpen) {
@@ -921,6 +923,16 @@ export function AuthModal({
                       One-Click Instant Verification & Enter Portal &rarr;
                     </>
                   )}
+                </button>
+
+                {/* Open Webmail & Read Dispatched Email button */}
+                <button
+                  type="button"
+                  onClick={() => setIsWebmailOpen(true)}
+                  className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100/80 border-2 border-blue-200 text-blue-950 rounded-xl text-xs font-bold flex items-center justify-center gap-2 transition-colors cursor-pointer shadow-xs"
+                >
+                  <Mail className="w-4 h-4 text-blue-700" />
+                  <span>📬 Open Academy Webmail & Read Email ({activationSentInfo.user.email})</span>
                 </button>
 
                 <div className="flex items-center gap-2">
@@ -1916,6 +1928,16 @@ export function AuthModal({
         </div>
 
       </div>
+
+      <WebmailModal
+        isOpen={isWebmailOpen}
+        onClose={() => setIsWebmailOpen(false)}
+        filterEmail={activationSentInfo?.user?.email || studentIdentifier || instructorIdentifier || adminIdentifier || ''}
+        onActivateFromEmail={(code) => {
+          setInputActivationCode(code);
+          handleVerifyActivationCode(code);
+        }}
+      />
     </div>
   );
 }
