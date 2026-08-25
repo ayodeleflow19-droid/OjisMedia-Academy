@@ -318,6 +318,32 @@ export const INITIAL_ACADEMY_USERS: UserAccount[] = [
     directMessages: []
   },
   {
+    id: 'usr-std-ibile-001',
+    role: 'student',
+    name: 'Ibile Africa',
+    email: 'ibileafrica@gmail.com',
+    phone: '+234 812 000 7890',
+    avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=300&auto=format&fit=crop&q=80',
+    identifierCode: 'OJIS-STD-2026-901',
+    joinedDate: 'March 2026',
+    status: 'Active',
+    isVerified: true,
+    bio: 'Creative media student enrolled for Advanced Video Editing, Cinematography and Storytelling.',
+    studentDetails: {
+      enrolledCourseId: 'video-editing-color',
+      enrolledCourseTitle: 'Advanced Video Editing & Color Grading',
+      cohort: 'April 2026 Cohort (Starts Apr 6)',
+      learningMode: 'Physical',
+      attendancePercentage: 100,
+      completedModules: 0,
+      totalModules: 12,
+      assignedInstructor: 'Engr. Christopher Daniels',
+      nextClassDate: 'Orientation: April 4th at 11:00 AM (Studio Lab 1)',
+      tuitionStatus: 'Paid in Full',
+    },
+    directMessages: []
+  },
+  {
     id: 'usr-std-006',
     role: 'student',
     name: 'Femi Johnson',

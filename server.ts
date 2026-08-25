@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import path from 'path';
 import { createServer as createViteServer } from 'vite';
-import { getDatabase, getDatabaseStatus, getMemoryStore } from './server/db';
+import { getDatabase, getDatabaseStatus, getMemoryStore, syncMemoryUsersToMongo } from './server/db';
 import { SEED_CATEGORIES, SEED_COURSES } from './server/seedData';
 import { sendActivationEmail, getEmailProviderStatus, sendTestEmail, getSentEmails, getLatestSentEmail } from './server/email';
 
@@ -233,21 +233,27 @@ async function startServer() {
         updatedAt: new Date(),
       };
 
+      // Always store in memory store first for immediate local availability
+      const store = getMemoryStore().users;
+      store.set(userDoc.id, userDoc);
+      store.set(userDoc.email, userDoc);
+      store.set(userDoc.identifierCode, userDoc);
+
       const { db, isFallback } = await getDatabase();
 
       if (db && !isFallback) {
-        const collection = db.collection('users');
-        const existing = await collection.findOne({ email: userDoc.email });
-        if (existing) {
-          return res.status(409).json({ error: 'An account with this email address already exists.' });
+        try {
+          const collection = db.collection('users');
+          // Upsert or insert into MongoDB
+          await collection.updateOne(
+            { email: userDoc.email },
+            { $set: userDoc },
+            { upsert: true }
+          );
+          console.log(`[MongoDB] Successfully recorded registered user: ${userDoc.email} (${userDoc.role})`);
+        } catch (dbErr) {
+          console.warn('[MongoDB] Warning during user insert:', dbErr);
         }
-        await collection.insertOne(userDoc);
-      } else {
-        const store = getMemoryStore().users;
-        if (Array.from(store.values()).some((u: any) => u.email === userDoc.email)) {
-          return res.status(409).json({ error: 'An account with this email address already exists.' });
-        }
-        store.set(userDoc.identifierCode, userDoc);
       }
 
       // Determine App Base URL for the activation link
@@ -589,21 +595,56 @@ async function startServer() {
     try {
       const { db, isFallback } = await getDatabase();
       if (db && !isFallback) {
+        // Auto-sync any memory store users into MongoDB first
+        await syncMemoryUsersToMongo(db);
+
         const users = await db.collection('users').find({}).sort({ createdAt: -1 }).toArray();
         const sanitized = users.map((u: any) => {
           const { password, ...rest } = u;
           return rest;
         });
-        return res.json({ success: true, count: sanitized.length, users: sanitized });
+        return res.json({ success: true, count: sanitized.length, users: sanitized, databaseProvider: 'MongoDB' });
       } else {
         const memoryUsers = Array.from(getMemoryStore().users.values()).map((u: any) => {
           const { password, ...rest } = u;
           return rest;
         });
-        return res.json({ success: true, count: memoryUsers.length, users: memoryUsers });
+        // Deduplicate by email
+        const uniqueMap = new Map<string, any>();
+        memoryUsers.forEach((u: any) => {
+          if (u.email) uniqueMap.set(u.email.toLowerCase(), u);
+        });
+        const uniqueUsers = Array.from(uniqueMap.values());
+        return res.json({ success: true, count: uniqueUsers.length, users: uniqueUsers, databaseProvider: 'MemoryFallback' });
       }
     } catch (err: any) {
       return res.status(500).json({ error: 'Failed to fetch users directory.', details: err?.message });
+    }
+  });
+
+  // Explicit Sync Users to MongoDB
+  app.post('/api/admin/sync-users', async (_req: Request, res: Response) => {
+    try {
+      const { db, isConnected, isFallback, error } = await getDatabase();
+      if (db && !isFallback) {
+        const syncedCount = await syncMemoryUsersToMongo(db);
+        const mongoCount = await db.collection('users').countDocuments({});
+        return res.json({
+          success: true,
+          message: `Successfully synchronized ${syncedCount} users into MongoDB. Total registered users in database: ${mongoCount}.`,
+          syncedCount,
+          mongoCount,
+          databaseStatus: 'Connected',
+        });
+      } else {
+        return res.json({
+          success: false,
+          error: error || 'MongoDB is not currently connected. Operating in resilient in-memory mode.',
+          databaseStatus: isConnected ? 'Connected' : 'Fallback Mode',
+        });
+      }
+    } catch (err: any) {
+      return res.status(500).json({ success: false, error: err?.message || 'Error executing sync.' });
     }
   });
 

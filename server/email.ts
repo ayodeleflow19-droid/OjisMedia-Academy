@@ -24,28 +24,31 @@ export interface EmailStatusResult {
  * Returns active provider details
  */
 export function getEmailProviderStatus(): EmailStatusResult {
-  const gmailUser = process.env.GMAIL_USER || (process.env.SMTP_USER && process.env.SMTP_USER.includes('@gmail.com') ? process.env.SMTP_USER : 'ayodeleflow19@gmail.com');
-  const gmailPass = process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASS || process.env.SMTP_PASS;
-  const resendKey = process.env.RESEND_API_KEY;
+  const rawResendKey = process.env.RESEND_API_KEY;
+  const resendKey = rawResendKey ? rawResendKey.trim().replace(/^['"]+|['"]+$/g, '') : undefined;
+  const gmailUser = (process.env.GMAIL_USER || (process.env.SMTP_USER && process.env.SMTP_USER.includes('@gmail.com') ? process.env.SMTP_USER : 'ayodeleflow19@gmail.com')).trim().replace(/^['"]+|['"]+$/g, '');
+  const gmailPass = (process.env.GMAIL_APP_PASSWORD || process.env.GMAIL_APP_PASS || '').trim().replace(/\s+/g, '');
   const smtpHost = process.env.SMTP_HOST;
   const smtpUser = process.env.SMTP_USER;
   const smtpPass = process.env.SMTP_PASS;
 
-  if (gmailPass) {
+  if (resendKey && resendKey.length > 5) {
+    const masked = resendKey.length > 10 ? `${resendKey.substring(0, 5)}...${resendKey.substring(resendKey.length - 4)}` : 'Active';
+    const fromEmail = (process.env.SMTP_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
+    return {
+      isConfigured: true,
+      provider: 'resend',
+      fromEmail,
+      message: `Resend API Key configured [${masked}] (3,000 free emails/month via ${fromEmail})`,
+    };
+  }
+
+  if (gmailPass && gmailPass.length >= 8) {
     return {
       isConfigured: true,
       provider: 'gmail_smtp',
       fromEmail: gmailUser,
       message: `Free Gmail SMTP configured for ${gmailUser} (up to 500 emails/day)`,
-    };
-  }
-
-  if (resendKey) {
-    return {
-      isConfigured: true,
-      provider: 'resend',
-      fromEmail: process.env.SMTP_FROM_EMAIL || 'onboarding@resend.dev',
-      message: 'Resend API Key configured (up to 3,000 free emails/month)',
     };
   }
 
@@ -466,8 +469,9 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
   // ==========================================
   if (status.provider === 'resend') {
     try {
-      const resend = new Resend(process.env.RESEND_API_KEY);
-      const fromEmail = process.env.SMTP_FROM_EMAIL || 'onboarding@resend.dev';
+      const cleanKey = (process.env.RESEND_API_KEY || '').trim().replace(/^['"]+|['"]+$/g, '');
+      const resend = new Resend(cleanKey);
+      const fromEmail = (process.env.RESEND_FROM_EMAIL || process.env.SMTP_FROM_EMAIL || 'onboarding@resend.dev').trim();
 
       const res = await resend.emails.send({
         from: `OJIS Media Academy <${fromEmail}>`,

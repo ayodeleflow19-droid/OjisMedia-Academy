@@ -527,6 +527,28 @@ export const api = {
   },
 
   /**
+   * Synchronize all registered users to MongoDB database
+   */
+  async syncUsersToDatabase(): Promise<{ success: boolean; message?: string; syncedCount?: number; mongoCount?: number; error?: string }> {
+    const res = await safeJsonFetch<{ success: boolean; message?: string; syncedCount?: number; mongoCount?: number; error?: string }>(
+      '/api/admin/sync-users',
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+      }
+    );
+
+    if (res.ok && res.data?.success) {
+      return res.data;
+    }
+
+    return {
+      success: false,
+      error: res.data?.error || res.error || 'Failed to synchronize users with database.',
+    };
+  },
+
+  /**
    * Create a new user (Student, Instructor, or Admin)
    */
   async createAdminUser(userData: Partial<UserAccount> & { password?: string }): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
