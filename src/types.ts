@@ -172,7 +172,7 @@ export interface ContactInquiry {
 
 export type UserRole = 'student' | 'instructor' | 'admin';
 
-export type UserStatus = 'Active' | 'Under Review' | 'Verified' | 'Suspended' | 'Inactive';
+export type UserStatus = 'Active' | 'Pending Activation' | 'Under Review' | 'Verified' | 'Suspended' | 'Inactive';
 
 export type AuthMode = 'login' | 'signup' | 'forgot_password';
 
@@ -198,6 +198,9 @@ export interface UserAccount {
   identifierCode: string; // e.g. OJIS-STD-2026-081, OJIS-FAC-014, OJIS-ADM-002, OJIS-MASTER-ADM-001
   joinedDate: string;
   status: UserStatus;
+  isVerified?: boolean;
+  activationCode?: string;
+  verificationToken?: string;
   statusReason?: string;
   bio?: string;
   directMessages?: UserDirectMessage[];

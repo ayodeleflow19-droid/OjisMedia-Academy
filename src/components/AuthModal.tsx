@@ -93,8 +93,10 @@ export function AuthModal({
   // Email Activation Confirmation State
   const [activationSentInfo, setActivationSentInfo] = useState<{
     user: UserAccount;
-    emailStatus?: { sent: boolean; provider: string; activationUrl?: string; message?: string; error?: string };
+    emailStatus?: { sent: boolean; provider: string; activationUrl?: string; activationCode?: string; message?: string; error?: string };
   } | null>(null);
+  const [inputActivationCode, setInputActivationCode] = useState('');
+  const [isVerifyingCode, setIsVerifyingCode] = useState(false);
   const [isResending, setIsResending] = useState(false);
   const [resendSuccess, setResendSuccess] = useState<string | null>(null);
   const [isActivatingDirectly, setIsActivatingDirectly] = useState(false);
@@ -108,6 +110,7 @@ export function AuthModal({
       setSuccessMessage(null);
       setRecoverySubmitted(false);
       setActivationSentInfo(null);
+      setInputActivationCode('');
       setResendSuccess(null);
     }
   }, [isOpen, initialRole, initialMode]);
@@ -121,7 +124,7 @@ export function AuthModal({
     }
     return () => {
       document.body.style.overflow = 'unset';
-    }
+    };
   }, [isOpen]);
 
   if (!isOpen) return null;
@@ -139,6 +142,48 @@ export function AuthModal({
     }, 450);
   };
 
+  // Handle 6-Digit Activation Code Verification
+  const handleVerifyActivationCode = async (codeToVerify?: string) => {
+    const targetCode = (codeToVerify || inputActivationCode).trim();
+    const targetEmail = activationSentInfo?.user?.email;
+
+    if (!targetCode) {
+      setErrorMessage('Please enter your 6-digit activation code.');
+      return;
+    }
+
+    if (!targetEmail) {
+      setErrorMessage('Account email address is missing. Please try again.');
+      return;
+    }
+
+    setIsVerifyingCode(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await api.activateAccount(undefined, targetEmail, targetCode);
+      if (res.success && res.user) {
+        const activatedUser: UserAccount = {
+          ...res.user,
+          status: 'Active',
+          isVerified: true,
+        };
+        setStoredUser(activatedUser);
+        saveRegisteredUser(activatedUser);
+        setIsVerifyingCode(false);
+        onAuthSuccess(activatedUser, `🎉 Account Activated! Welcome to OJIS Media Academy, ${activatedUser.name}`);
+        onClose();
+        return;
+      } else {
+        setIsVerifyingCode(false);
+        setErrorMessage(res.error || 'Invalid 6-digit activation code. Please check and try again.');
+      }
+    } catch (e: any) {
+      setIsVerifyingCode(false);
+      setErrorMessage(e?.message || 'Activation server error. Please try direct activation.');
+    }
+  };
+
   // Handle Student Submit
   const handleStudentSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -152,40 +197,49 @@ export function AuthModal({
 
       setIsLoading(true);
 
-      const isDemo = studentIdentifier.includes('adeola') || studentIdentifier.includes('OJIS-STD');
+      const isDemo = studentIdentifier.includes('adeola') || studentIdentifier.includes('OJIS-STD-2026-081');
       let user: UserAccount | null = null;
 
       if (!isDemo) {
-        // Try backend MongoDB login first
+        // Try backend login with verification checks
         const res = await api.loginUser(studentIdentifier, studentPassword, 'student');
+        
+        if (res.isUnverified) {
+          setIsLoading(false);
+          setActivationSentInfo({
+            user: {
+              id: 'usr_' + Date.now(),
+              role: 'student',
+              name: studentIdentifier.split('@')[0],
+              email: res.email || studentIdentifier,
+              identifierCode: res.identifierCode || 'OJIS-STD-PENDING',
+              joinedDate: new Date().toISOString().split('T')[0],
+              status: 'Pending Activation',
+              isVerified: false,
+              activationCode: res.activationCode,
+            },
+            emailStatus: {
+              sent: true,
+              provider: 'Academy Email Server',
+              activationCode: res.activationCode,
+            },
+          });
+          if (res.activationCode) {
+            setInputActivationCode(res.activationCode);
+          }
+          setErrorMessage(res.error || 'Your account is pending activation. Please enter your 6-digit activation code.');
+          return;
+        }
+
         if (res.success && res.user) {
           user = res.user;
+        } else {
+          setIsLoading(false);
+          setErrorMessage(res.error || 'Invalid student credentials. Please verify your email/ID and password.');
+          return;
         }
-      }
-
-      if (!user) {
-        // Fallback demo/registered
-        user = isDemo ? DEMO_ACCOUNTS.student : {
-          id: 'std-' + Date.now(),
-          role: 'student',
-          name: studentIdentifier.split('@')[0] || 'Enrolled Student',
-          email: studentIdentifier.includes('@') ? studentIdentifier : `${studentIdentifier.toLowerCase()}@ojismedia.student`,
-          identifierCode: studentIdentifier.startsWith('OJIS') ? studentIdentifier : `OJIS-STD-${Math.floor(1000 + Math.random() * 9000)}`,
-          joinedDate: 'August 2026',
-          status: 'Active',
-          studentDetails: {
-            enrolledCourseId: studentTrack,
-            enrolledCourseTitle: COURSES_DATA.find(c => c.id === studentTrack)?.title || 'Professional Media Course',
-            cohort: 'April 2026 Cohort',
-            learningMode: studentMode,
-            attendancePercentage: 92,
-            completedModules: 2,
-            totalModules: 10,
-            assignedInstructor: 'Adekunle Alabi',
-            nextClassDate: 'Thursday at 10:00 AM',
-            tuitionStatus: 'Paid in Full',
-          },
-        };
+      } else {
+        user = DEMO_ACCOUNTS.student;
       }
 
       setIsLoading(false);
@@ -213,11 +267,12 @@ export function AuthModal({
         id: 'std-' + Date.now(),
         role: 'student',
         name: studentFullName,
-        email: studentIdentifier,
+        email: studentIdentifier.toLowerCase().trim(),
         phone: studentPhone || '+234 812 000 0000',
         identifierCode: `OJIS-STD-2026-${Math.floor(100 + Math.random() * 900)}`,
-        joinedDate: 'August 2026',
-        status: 'Active',
+        joinedDate: new Date().toISOString().split('T')[0],
+        status: 'Pending Activation',
+        isVerified: false,
         studentDetails: {
           enrolledCourseId: studentTrack,
           enrolledCourseTitle: selectedCourse?.title || 'Creative Media Track',
@@ -232,7 +287,7 @@ export function AuthModal({
         },
       };
 
-      // Save to MongoDB
+      // Save to MongoDB / local registry
       const registerRes = await api.registerUser({
         ...newStudent,
         password: studentPassword,
@@ -240,21 +295,23 @@ export function AuthModal({
 
       if (!registerRes.success) {
         setIsLoading(false);
-        setErrorMessage(registerRes.error || 'Failed to create student account in MongoDB. Please try again.');
+        setErrorMessage(registerRes.error || 'Failed to create student account. Please try again.');
         return;
       }
 
       const finalUser = registerRes.user || newStudent;
+      const finalCode = registerRes.activationCode || registerRes.emailStatus?.activationCode;
 
-      saveRegisteredUser(finalUser);
-      setStoredUser(finalUser);
       setIsLoading(false);
 
-      // Open email activation confirmation screen
+      // Open email activation confirmation screen (DO NOT LOG IN AUTOMATICALLY)
       setActivationSentInfo({
         user: finalUser,
         emailStatus: registerRes.emailStatus,
       });
+      if (finalCode) {
+        setInputActivationCode(finalCode);
+      }
     }
   };
 
@@ -268,9 +325,13 @@ export function AuthModal({
     try {
       const res = await api.resendActivation(activationSentInfo.user.email);
       if (res.success) {
-        setResendSuccess(`Fresh activation email dispatched to ${activationSentInfo.user.email}!`);
+        const codeMsg = res.activationCode ? ` Code: [${res.activationCode}]` : '';
+        setResendSuccess(`Fresh activation code dispatched to ${activationSentInfo.user.email}!${codeMsg}`);
+        if (res.activationCode) {
+          setInputActivationCode(res.activationCode);
+        }
       } else {
-        setErrorMessage(res.error || 'Failed to re-send activation email.');
+        setErrorMessage(res.error || 'Failed to re-send activation code.');
       }
     } catch (e: any) {
       setErrorMessage(e?.message || 'Error communicating with activation server.');
@@ -281,7 +342,7 @@ export function AuthModal({
 
   // Handle Direct One-Click Activation
   const handleDirectActivation = async () => {
-    if (!activationSentInfo?.user) return;
+    if (!activationSentInfo?.user?.email) return;
     setIsActivatingDirectly(true);
     setErrorMessage(null);
 
@@ -291,13 +352,14 @@ export function AuthModal({
         const activatedUser: UserAccount = {
           ...(res.user || activationSentInfo.user),
           status: 'Active',
+          isVerified: true,
         };
         setStoredUser(activatedUser);
         saveRegisteredUser(activatedUser);
         onAuthSuccess(activatedUser, `🎉 Account Activated! Welcome to OJIS Media Academy, ${activatedUser.name}`);
         onClose();
       } else {
-        setErrorMessage(res.error || 'Direct activation failed. Please click the link in your email.');
+        setErrorMessage(res.error || 'Direct activation failed. Please enter the 6-digit activation code.');
       }
     } catch (e: any) {
       setErrorMessage(e?.message || 'Activation server error.');
@@ -323,31 +385,43 @@ export function AuthModal({
 
       if (!isDemo) {
         const res = await api.loginUser(instructorIdentifier, instructorPassword, 'instructor');
+        
+        if (res.isUnverified) {
+          setIsLoading(false);
+          setActivationSentInfo({
+            user: {
+              id: 'usr_' + Date.now(),
+              role: 'instructor',
+              name: instructorIdentifier.split('@')[0],
+              email: res.email || instructorIdentifier,
+              identifierCode: res.identifierCode || 'OJIS-FAC-PENDING',
+              joinedDate: new Date().toISOString().split('T')[0],
+              status: 'Pending Activation',
+              isVerified: false,
+              activationCode: res.activationCode,
+            },
+            emailStatus: {
+              sent: true,
+              provider: 'Academy Mail Server',
+              activationCode: res.activationCode,
+            },
+          });
+          if (res.activationCode) {
+            setInputActivationCode(res.activationCode);
+          }
+          setErrorMessage(res.error || 'Your faculty account is pending activation. Please enter your 6-digit activation code.');
+          return;
+        }
+
         if (res.success && res.user) {
           user = res.user;
+        } else {
+          setIsLoading(false);
+          setErrorMessage(res.error || 'Invalid faculty credentials. Please check your email and password.');
+          return;
         }
-      }
-
-      if (!user) {
-        user = isDemo ? DEMO_ACCOUNTS.instructor : {
-          id: 'fac-' + Date.now(),
-          role: 'instructor',
-          name: instructorIdentifier.split('@')[0] || 'Faculty Member',
-          email: instructorIdentifier.includes('@') ? instructorIdentifier : `${instructorIdentifier.toLowerCase()}@ojismedia.academy`,
-          identifierCode: instructorIdentifier.startsWith('OJIS') ? instructorIdentifier : `OJIS-FAC-0${Math.floor(10 + Math.random() * 90)}`,
-          joinedDate: 'August 2026',
-          status: 'Verified',
-          instructorDetails: {
-            title: 'Senior Faculty Instructor',
-            department: instructorDepartment,
-            specialization: 'Creative Production & Studio Masterclass',
-            yearsOfExperience: 7,
-            activeBatches: ['April 2026 Main Cohort'],
-            assignedStudentsCount: 24,
-            rating: 4.9,
-            officeHours: 'Mon & Wed, 3:00 PM - 5:00 PM',
-          },
-        };
+      } else {
+        user = DEMO_ACCOUNTS.instructor;
       }
 
       setIsLoading(false);
@@ -366,11 +440,12 @@ export function AuthModal({
         id: 'fac-' + Date.now(),
         role: 'instructor',
         name: instructorFullName,
-        email: instructorIdentifier,
+        email: instructorIdentifier.toLowerCase().trim(),
         phone: instructorPhone,
         identifierCode: `OJIS-FAC-0${Math.floor(20 + Math.random() * 80)}`,
-        joinedDate: 'August 2026',
-        status: 'Under Review',
+        joinedDate: new Date().toISOString().split('T')[0],
+        status: 'Pending Activation',
+        isVerified: false,
         instructorDetails: {
           title: instructorTitle || 'Adjunct Media Instructor',
           department: instructorDepartment,
@@ -392,21 +467,23 @@ export function AuthModal({
 
       if (!regRes.success) {
         setIsLoading(false);
-        setErrorMessage(regRes.error || 'Failed to submit faculty registration in MongoDB.');
+        setErrorMessage(regRes.error || 'Failed to submit faculty registration.');
         return;
       }
 
       const finalUser = regRes.user || newInstructor;
+      const finalCode = regRes.activationCode || regRes.emailStatus?.activationCode;
 
-      saveRegisteredUser(finalUser);
-      setStoredUser(finalUser);
       setIsLoading(false);
 
-      // Open email activation confirmation screen
+      // Open email activation confirmation screen (DO NOT LOG IN AUTOMATICALLY)
       setActivationSentInfo({
         user: finalUser,
         emailStatus: regRes.emailStatus,
       });
+      if (finalCode) {
+        setInputActivationCode(finalCode);
+      }
     }
   };
 
@@ -473,24 +550,13 @@ export function AuthModal({
         const res = await api.loginUser(adminIdentifier, adminPassword, 'admin');
         if (res.success && res.user) {
           user = res.user;
+        } else {
+          setIsLoading(false);
+          setErrorMessage(res.error || 'Invalid admin credentials.');
+          return;
         }
-      }
-
-      if (!user) {
-        user = isMasterEmail ? MASTER_ADMIN_ACCOUNT : (isDemo ? DEMO_ACCOUNTS.admin : {
-          id: 'adm-' + Date.now(),
-          role: 'admin',
-          name: adminIdentifier.split('@')[0] || 'System Administrator',
-          email: adminIdentifier.includes('@') ? adminIdentifier : `${adminIdentifier.toLowerCase()}@ojismedia.academy`,
-          identifierCode: adminIdentifier.startsWith('OJIS') ? adminIdentifier : `OJIS-ADM-00${Math.floor(1 + Math.random() * 9)}`,
-          joinedDate: 'August 2026',
-          status: 'Verified',
-          adminDetails: {
-            department: adminDepartment,
-            clearanceLevel: 'Operations Lead',
-            authorizedLocations: ['Lagos Ikeja Main Studio', 'Online Cloud Campus'],
-          },
-        });
+      } else {
+        user = isMasterEmail ? MASTER_ADMIN_ACCOUNT : DEMO_ACCOUNTS.admin;
       }
 
       setIsLoading(false);
@@ -513,10 +579,11 @@ export function AuthModal({
         id: 'adm-' + Date.now(),
         role: 'admin',
         name: adminFullName,
-        email: adminIdentifier,
+        email: adminIdentifier.toLowerCase().trim(),
         identifierCode: adminStaffId || `OJIS-ADM-0${Math.floor(10 + Math.random() * 90)}`,
-        joinedDate: 'August 2026',
+        joinedDate: new Date().toISOString().split('T')[0],
         status: 'Verified',
+        isVerified: true,
         adminDetails: {
           department: adminDepartment,
           clearanceLevel: 'Admissions Officer',
@@ -759,16 +826,73 @@ export function AuthModal({
                   </span>
                 </div>
                 <div className="flex items-center justify-between py-1">
-                  <span className="text-slate-500 font-medium">Email Dispatch:</span>
+                  <span className="text-slate-500 font-medium">Delivery Channel:</span>
                   <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
                     <Zap className="w-3 h-3 text-amber-500" />
                     {activationSentInfo.emailStatus?.provider === 'gmail_smtp'
-                      ? 'Free Gmail SMTP (Sent)'
+                      ? 'Live Gmail SMTP'
                       : activationSentInfo.emailStatus?.provider === 'resend'
-                      ? 'Free Resend API (Sent)'
-                      : 'Live Token Active'}
+                      ? 'Live Resend API'
+                      : 'Live Token Verification Engine'}
                   </span>
                 </div>
+              </div>
+
+              {/* 6-Digit Activation Code Form */}
+              <div className="bg-gradient-to-br from-blue-50/90 to-indigo-50/50 border-2 border-blue-200 rounded-2xl p-4 space-y-3 text-center">
+                <div>
+                  <span className="text-[11px] font-bold tracking-wider text-blue-900 uppercase">
+                    Enter 6-Digit Activation Code
+                  </span>
+                  <p className="text-[11px] text-slate-600 mt-0.5">
+                    Enter the code sent to your email (or use the one generated for your session below):
+                  </p>
+                </div>
+
+                <div className="flex items-center justify-center gap-2">
+                  <input
+                    type="text"
+                    maxLength={6}
+                    value={inputActivationCode}
+                    onChange={(e) => setInputActivationCode(e.target.value.replace(/\D/g, ''))}
+                    placeholder="e.g. 123456"
+                    className="w-48 py-2 text-center text-2xl font-mono font-bold tracking-widest bg-white text-slate-900 border-2 border-blue-400 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-600 shadow-inner"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => handleVerifyActivationCode()}
+                    disabled={isVerifyingCode || !inputActivationCode.trim()}
+                    className="py-2.5 px-4 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold text-xs flex items-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50 shadow-xs"
+                  >
+                    {isVerifyingCode ? (
+                      <RefreshCw className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                    )}
+                    Verify & Unlock
+                  </button>
+                </div>
+
+                {activationSentInfo.emailStatus?.activationCode && (
+                  <div className="pt-1 flex items-center justify-center gap-2 text-[11px] text-slate-600">
+                    <span>Generated Code:</span>
+                    <span className="font-mono font-bold bg-white px-2 py-0.5 rounded border border-blue-200 text-blue-900">
+                      {activationSentInfo.emailStatus.activationCode}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activationSentInfo.emailStatus?.activationCode) {
+                          setInputActivationCode(activationSentInfo.emailStatus.activationCode);
+                          handleVerifyActivationCode(activationSentInfo.emailStatus.activationCode);
+                        }
+                      }}
+                      className="text-blue-700 font-semibold underline hover:text-blue-900 cursor-pointer"
+                    >
+                      Auto-Fill & Verify
+                    </button>
+                  </div>
+                )}
               </div>
 
               {resendSuccess && (
@@ -784,7 +908,7 @@ export function AuthModal({
                   type="button"
                   onClick={handleDirectActivation}
                   disabled={isActivatingDirectly}
-                  className="w-full py-2.5 px-4 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                  className="w-full py-2.5 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
                 >
                   {isActivatingDirectly ? (
                     <>
@@ -793,8 +917,8 @@ export function AuthModal({
                     </>
                   ) : (
                     <>
-                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
-                      Instant Activate & Enter Student Portal &rarr;
+                      <Sparkles className="w-3.5 h-3.5 text-amber-300" />
+                      One-Click Instant Verification & Enter Portal &rarr;
                     </>
                   )}
                 </button>
@@ -811,7 +935,7 @@ export function AuthModal({
                     ) : (
                       <Send className="w-3.5 h-3.5 text-blue-900" />
                     )}
-                    <span>Resend Email</span>
+                    <span>Resend Code / Email</span>
                   </button>
 
                   {activationSentInfo.emailStatus?.activationUrl && (
@@ -842,9 +966,12 @@ export function AuthModal({
                 </div>
               </div>
 
-              <p className="text-[11px] text-center text-slate-500 pt-1">
-                Tip: If you do not see the email in your main inbox within 1-2 minutes, please verify your spam or junk folder.
-              </p>
+              <div className="p-3 bg-slate-100 rounded-xl text-[11px] text-slate-600 space-y-1">
+                <p className="font-semibold text-slate-800">ℹ️ Note regarding Email Delivery:</p>
+                <p>
+                  To receive real emails in your personal Gmail or Outlook inbox, set <code className="bg-white px-1 py-0.5 rounded border border-slate-200 font-mono text-[10px]">GMAIL_APP_PASSWORD</code> (free Gmail SMTP) or <code className="bg-white px-1 py-0.5 rounded border border-slate-200 font-mono text-[10px]">RESEND_API_KEY</code> in your environment settings.
+                </p>
+              </div>
             </div>
           ) : (
             <>

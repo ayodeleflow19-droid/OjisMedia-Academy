@@ -8,6 +8,7 @@ export interface EmailSendOptions {
   identifierCode: string;
   courseTitle?: string;
   cohort?: string;
+  activationCode: string;
   activationToken: string;
   appUrl?: string;
 }
@@ -74,9 +75,10 @@ function buildActivationEmailHtml(params: {
   identifierCode: string;
   courseTitle?: string;
   cohort?: string;
+  activationCode: string;
   activationUrl: string;
 }): string {
-  const { name, role, identifierCode, courseTitle, cohort, activationUrl } = params;
+  const { name, role, identifierCode, courseTitle, cohort, activationCode, activationUrl } = params;
   const roleLabel = role === 'student' ? 'Student' : role === 'instructor' ? 'Faculty Instructor' : 'Staff Member';
 
   return `
@@ -160,7 +162,7 @@ function buildActivationEmailHtml(params: {
       border: 1px solid #e2e8f0;
       border-radius: 12px;
       padding: 20px;
-      margin-bottom: 28px;
+      margin-bottom: 24px;
     }
     .cred-row {
       display: flex;
@@ -182,9 +184,33 @@ function buildActivationEmailHtml(params: {
       color: #0f172a;
       text-align: right;
     }
+    .code-box {
+      background: linear-gradient(135deg, #f0fdf4 0%, #ecfdf5 100%);
+      border: 2px dashed #10b981;
+      border-radius: 14px;
+      padding: 24px 16px;
+      text-align: center;
+      margin: 24px 0;
+    }
+    .code-label {
+      font-size: 11px;
+      font-weight: 700;
+      color: #065f46;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 8px;
+    }
+    .code-digits {
+      font-size: 36px;
+      font-weight: 900;
+      letter-spacing: 10px;
+      color: #047857;
+      font-family: 'Courier New', Courier, monospace;
+      margin: 4px 0;
+    }
     .btn-container {
       text-align: center;
-      margin: 32px 0;
+      margin: 28px 0 20px 0;
     }
     .activate-btn {
       display: inline-block;
@@ -239,7 +265,7 @@ function buildActivationEmailHtml(params: {
       <div class="body-content">
         <h2 class="greeting">Hello, ${name}!</h2>
         <p class="text">
-          Congratulations on taking your step into creative excellence. Your official ${roleLabel} account has been registered on the <strong>OJIS Media Academy Portal</strong>.
+          Congratulations on taking your step into creative excellence. Your official ${roleLabel} account has been created on the <strong>OJIS Media Academy Portal</strong>.
         </p>
 
         <div class="credentials-card">
@@ -263,12 +289,21 @@ function buildActivationEmailHtml(params: {
           </div>` : ''}
           <div class="cred-row">
             <span class="cred-label">Verification Status:</span>
-            <span class="cred-val" style="color: #ea580c;">Pending One-Click Activation</span>
+            <span class="cred-val" style="color: #ea580c;">Action Required (Activation Code)</span>
           </div>
         </div>
 
-        <p class="text" style="margin-bottom: 12px;">
-          To activate your student portal, access your course curriculum, studio schedule, and workshop clearances, please click the verification button below:
+        <!-- 6-DIGIT ACTIVATION CODE HIGHLIGHT -->
+        <div class="code-box">
+          <div class="code-label">YOUR 6-DIGIT ACTIVATION CODE</div>
+          <div class="code-digits">${activationCode}</div>
+          <div style="font-size: 12px; color: #065f46; font-weight: 500;">
+            Enter this 6-digit code on the academy login screen to unlock your dashboard.
+          </div>
+        </div>
+
+        <p class="text" style="margin-bottom: 12px; text-align: center;">
+          You can also activate your account with a single click:
         </p>
 
         <div class="btn-container">
@@ -278,14 +313,14 @@ function buildActivationEmailHtml(params: {
         </div>
 
         <p class="text" style="font-size: 13px; color: #64748b; margin-bottom: 6px;">
-          Or copy and paste this direct verification link into your browser:
+          Direct verification link:
         </p>
         <div class="alt-link-box">
           <a href="${activationUrl}" style="color: #2563eb; text-decoration: underline;">${activationUrl}</a>
         </div>
 
         <div class="security-notice">
-          <strong>Security Notice:</strong> This activation link will expire in 24 hours. If you did not create an account with OJIS Media Academy, you can safely ignore this email.
+          <strong>Security Notice:</strong> This activation code will expire in 24 hours. If you did not create an account with OJIS Media Academy, please disregard this email.
         </div>
       </div>
 
@@ -310,15 +345,16 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
   success: boolean;
   provider: string;
   activationUrl: string;
+  activationCode: string;
   messageId?: string;
   error?: string;
 }> {
-  const { to, name, role, identifierCode, courseTitle, cohort, activationToken } = options;
+  const { to, name, role, identifierCode, courseTitle, cohort, activationCode, activationToken } = options;
 
   // Derive target app base URL
   const baseUrl = options.appUrl || process.env.APP_URL || 'http://localhost:3000';
   const cleanBaseUrl = baseUrl.endsWith('/') ? baseUrl.slice(0, -1) : baseUrl;
-  const activationUrl = `${cleanBaseUrl}/activate?token=${encodeURIComponent(activationToken)}&email=${encodeURIComponent(to)}`;
+  const activationUrl = `${cleanBaseUrl}/activate?token=${encodeURIComponent(activationToken)}&code=${encodeURIComponent(activationCode)}&email=${encodeURIComponent(to)}`;
 
   const emailHtml = buildActivationEmailHtml({
     name,
@@ -326,13 +362,14 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
     identifierCode,
     courseTitle,
     cohort,
+    activationCode,
     activationUrl,
   });
 
-  const subject = `Activate Your OJIS Media Academy Account (${identifierCode})`;
+  const subject = `Your OJIS Media Academy Activation Code: [${activationCode}] - ${identifierCode}`;
 
   const status = getEmailProviderStatus();
-  console.log(`[Email Service] Preparing activation email for ${to} via ${status.provider}...`);
+  console.log(`[Email Service] Preparing activation email for ${to} via ${status.provider}... (Code: ${activationCode})`);
 
   // ==========================================
   // 1. FREE GMAIL SMTP (Nodemailer)
@@ -362,6 +399,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
         success: true,
         provider: 'gmail_smtp',
         activationUrl,
+        activationCode,
         messageId: info.messageId,
       };
     } catch (err: any) {
@@ -370,6 +408,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
         success: false,
         provider: 'gmail_smtp',
         activationUrl,
+        activationCode,
         error: `Gmail SMTP dispatch failed: ${err?.message || 'Check App Password'}`,
       };
     }
@@ -396,6 +435,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
           success: false,
           provider: 'resend',
           activationUrl,
+          activationCode,
           error: res.error.message,
         };
       }
@@ -405,6 +445,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
         success: true,
         provider: 'resend',
         activationUrl,
+        activationCode,
         messageId: res.data?.id,
       };
     } catch (err: any) {
@@ -413,6 +454,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
         success: false,
         provider: 'resend',
         activationUrl,
+        activationCode,
         error: err?.message,
       };
     }
@@ -446,6 +488,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
         success: true,
         provider: 'custom_smtp',
         activationUrl,
+        activationCode,
         messageId: info.messageId,
       };
     } catch (err: any) {
@@ -454,6 +497,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
         success: false,
         provider: 'custom_smtp',
         activationUrl,
+        activationCode,
         error: err?.message,
       };
     }
@@ -467,6 +511,7 @@ export async function sendActivationEmail(options: EmailSendOptions): Promise<{
     success: true,
     provider: 'preview_mode',
     activationUrl,
+    activationCode,
     messageId: `preview_${Date.now()}`,
   };
 }
@@ -482,6 +527,7 @@ export async function sendTestEmail(targetEmail: string): Promise<{ success: boo
     role: 'admin',
     identifierCode: 'OJIS-TEST-2026',
     courseTitle: 'System Verification & Diagnostics',
+    activationCode: '882026',
     activationToken: testToken,
   });
 

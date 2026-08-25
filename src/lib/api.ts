@@ -1,7 +1,7 @@
 import { StudentEnrollment, UserAccount, ContactInquiry, CategoryItem, Course } from '../types';
 import { getStoredCategories, setStoredCategories } from '../data/categoriesData';
 import { getStoredCourses, setStoredCourses } from '../data/coursesData';
-import { saveRegisteredUser } from '../data/authDemoData';
+import { saveRegisteredUser, getRegisteredUsers, updateRegisteredUser } from '../data/authDemoData';
 
 export interface DatabaseHealthResponse {
   status: string;
@@ -138,13 +138,15 @@ export const api = {
   ): Promise<{
     success: boolean;
     user?: UserAccount;
-    emailStatus?: { sent: boolean; provider: string; activationUrl?: string; message?: string; error?: string };
+    activationCode?: string;
+    emailStatus?: { sent: boolean; provider: string; activationUrl?: string; activationCode?: string; message?: string; error?: string };
     error?: string;
   }> {
     const res = await safeJsonFetch<{
       success: boolean;
       user?: UserAccount;
-      emailStatus?: { sent: boolean; provider: string; activationUrl?: string; message?: string; error?: string };
+      activationCode?: string;
+      emailStatus?: { sent: boolean; provider: string; activationUrl?: string; activationCode?: string; message?: string; error?: string };
       error?: string;
     }>('/api/auth/register', {
       method: 'POST',
@@ -154,9 +156,16 @@ export const api = {
 
     // If the server returns a successful response with user
     if (res.ok && res.data?.user) {
+      saveRegisteredUser({
+        ...res.data.user,
+        status: 'Pending Activation',
+        isVerified: false,
+        activationCode: res.data.activationCode || res.data.emailStatus?.activationCode,
+      });
       return {
         success: true,
         user: res.data.user,
+        activationCode: res.data.activationCode || res.data.emailStatus?.activationCode,
         emailStatus: res.data.emailStatus,
       };
     }
@@ -173,6 +182,7 @@ export const api = {
     console.warn('[API Auth] Server register endpoint returned:', res.status, res.error, '- using robust local user registration');
     const rolePrefix = userData.role === 'student' ? 'STD' : userData.role === 'instructor' ? 'FAC' : 'ADM';
     const fallbackToken = `act_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+    const fallbackCode = Math.floor(100000 + Math.random() * 900000).toString();
     const fallbackIdCode = userData.identifierCode || `OJIS-${rolePrefix}-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
 
     const fallbackUser: UserAccount = {
@@ -183,7 +193,10 @@ export const api = {
       role: userData.role || 'student',
       identifierCode: fallbackIdCode,
       joinedDate: userData.joinedDate || new Date().toISOString().split('T')[0],
-      status: 'Active',
+      status: 'Pending Activation',
+      isVerified: false,
+      activationCode: fallbackCode,
+      verificationToken: fallbackToken,
       studentDetails: userData.studentDetails,
       instructorDetails: userData.instructorDetails,
       adminDetails: userData.adminDetails,
@@ -193,37 +206,47 @@ export const api = {
     saveRegisteredUser(fallbackUser);
 
     const activationUrl = typeof window !== 'undefined'
-      ? `${window.location.origin}${window.location.pathname}?token=${fallbackToken}&email=${encodeURIComponent(fallbackUser.email)}`
+      ? `${window.location.origin}${window.location.pathname}?token=${fallbackToken}&code=${fallbackCode}&email=${encodeURIComponent(fallbackUser.email)}`
       : '';
 
     return {
       success: true,
       user: fallbackUser,
+      activationCode: fallbackCode,
       emailStatus: {
         sent: true,
         provider: 'Local Activation Engine',
         activationUrl,
-        message: `Activation link generated for ${fallbackUser.email}`,
+        activationCode: fallbackCode,
+        message: `Activation code [${fallbackCode}] generated for ${fallbackUser.email}`,
       },
     };
   },
 
   /**
-   * Activate user account via verification token or email
+   * Activate user account via verification token, 6-digit code, or email
    */
   async activateAccount(
     token?: string,
-    email?: string
+    email?: string,
+    code?: string
   ): Promise<{ success: boolean; message?: string; user?: UserAccount; error?: string }> {
     const query = new URLSearchParams();
     if (token) query.set('token', token);
     if (email) query.set('email', email);
+    if (code) query.set('code', code);
 
     const res = await safeJsonFetch<{ success: boolean; message?: string; user?: UserAccount; error?: string }>(
       `/api/auth/activate?${query.toString()}`
     );
 
     if (res.ok && res.data?.success) {
+      if (res.data.user) {
+        updateRegisteredUser(res.data.user.id, {
+          status: 'Active',
+          isVerified: true,
+        });
+      }
       return {
         success: true,
         message: res.data.message || 'Account activated successfully!',
@@ -232,16 +255,20 @@ export const api = {
     }
 
     // Fallback: Check local storage for matching user
-    if (email || token) {
+    if (email || token || code) {
       try {
-        const localUsers = JSON.parse(localStorage.getItem('ojis_registered_users') || '[]');
+        const localUsers = getRegisteredUsers();
         const found = localUsers.find((u: any) => 
-          (email && u.email?.toLowerCase() === email.toLowerCase().trim()) ||
-          (token && u.verificationToken === token)
+          (code && u.activationCode === code.trim()) ||
+          (email && code && u.email?.toLowerCase() === email.toLowerCase().trim() && u.activationCode === code.trim()) ||
+          (token && u.verificationToken === token) ||
+          (email && u.email?.toLowerCase() === email.toLowerCase().trim())
         );
         if (found) {
           found.status = 'Active';
           found.isVerified = true;
+          delete found.activationCode;
+          delete found.verificationToken;
           saveRegisteredUser(found);
           return {
             success: true,
@@ -256,17 +283,17 @@ export const api = {
 
     return {
       success: false,
-      error: res.data?.error || res.error || 'Failed to activate account. The link may have expired.',
+      error: res.data?.error || res.error || 'Failed to activate account. Invalid code or link.',
     };
   },
 
   /**
-   * Resend activation email
+   * Resend activation email / 6-digit code
    */
   async resendActivation(
     email: string
-  ): Promise<{ success: boolean; message?: string; emailStatus?: any; error?: string }> {
-    const res = await safeJsonFetch<{ success: boolean; message?: string; emailStatus?: any; error?: string }>(
+  ): Promise<{ success: boolean; message?: string; activationCode?: string; emailStatus?: any; error?: string }> {
+    const res = await safeJsonFetch<{ success: boolean; message?: string; activationCode?: string; emailStatus?: any; error?: string }>(
       '/api/auth/resend-activation',
       {
         method: 'POST',
@@ -280,10 +307,19 @@ export const api = {
     }
 
     // Fallback response
+    const freshCode = Math.floor(100000 + Math.random() * 900000).toString();
+    const localUsers = getRegisteredUsers();
+    const target = localUsers.find(u => u.email.toLowerCase() === email.toLowerCase().trim());
+    if (target) {
+      target.activationCode = freshCode;
+      saveRegisteredUser(target);
+    }
+
     return {
       success: true,
-      message: `Fresh activation link dispatched for ${email}`,
-      emailStatus: { sent: true, provider: 'Local Delivery Engine' },
+      message: `Fresh activation code [${freshCode}] generated for ${email}`,
+      activationCode: freshCode,
+      emailStatus: { sent: true, provider: 'Local Delivery Engine', activationCode: freshCode },
     };
   },
 
@@ -331,10 +367,26 @@ export const api = {
   },
 
   /**
-   * Login user via MongoDB
+   * Login user via MongoDB / Memory store with verification checks
    */
-  async loginUser(identifier: string, password?: string, role?: string, pin?: string): Promise<{ success: boolean; user?: UserAccount; error?: string }> {
-    const res = await safeJsonFetch<{ success: boolean; user?: UserAccount; error?: string }>('/api/auth/login', {
+  async loginUser(identifier: string, password?: string, role?: string, pin?: string): Promise<{
+    success: boolean;
+    user?: UserAccount;
+    isUnverified?: boolean;
+    email?: string;
+    identifierCode?: string;
+    activationCode?: string;
+    error?: string;
+  }> {
+    const res = await safeJsonFetch<{
+      success: boolean;
+      user?: UserAccount;
+      isUnverified?: boolean;
+      email?: string;
+      identifierCode?: string;
+      activationCode?: string;
+      error?: string;
+    }>('/api/auth/login', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ identifier, password, role, pin }),
@@ -342,6 +394,40 @@ export const api = {
 
     if (res.ok && res.data?.user) {
       return { success: true, user: res.data.user };
+    }
+
+    // If server returned 403 Forbidden due to unverified account
+    if (res.status === 403 || res.data?.isUnverified) {
+      return {
+        success: false,
+        isUnverified: true,
+        email: res.data?.email || identifier,
+        identifierCode: res.data?.identifierCode,
+        activationCode: res.data?.activationCode,
+        error: res.data?.error || 'Your account is pending activation. Please enter your 6-digit activation code.',
+      };
+    }
+
+    // Client-side fallback check if offline
+    if (identifier) {
+      const clean = identifier.toLowerCase().trim();
+      const localUsers = getRegisteredUsers();
+      const localFound = localUsers.find(
+        u => u.email?.toLowerCase() === clean || u.identifierCode?.toLowerCase() === clean
+      );
+      if (localFound) {
+        if (localFound.status === 'Pending Activation' || localFound.isVerified === false) {
+          return {
+            success: false,
+            isUnverified: true,
+            email: localFound.email,
+            identifierCode: localFound.identifierCode,
+            activationCode: localFound.activationCode,
+            error: 'Your account is pending activation. Please enter your 6-digit activation code.',
+          };
+        }
+        return { success: true, user: localFound };
+      }
     }
 
     return {

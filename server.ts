@@ -197,6 +197,7 @@ async function startServer() {
       const prefix = role === 'student' ? 'STD' : role === 'instructor' ? 'FAC' : 'ADM';
       const identifierCode = `OJIS-${prefix}-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
       const activationToken = `act_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+      const activationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
       const userDoc = {
         id,
@@ -205,8 +206,9 @@ async function startServer() {
         role,
         password: password || 'demo1234',
         identifierCode,
-        status: 'Active', // Active by default with verified flag
+        status: 'Pending Activation', // Account is pending until activated
         isVerified: false,
+        activationCode,
         verificationToken: activationToken,
         tokenCreatedAt: new Date(),
         joinedDate: new Date().toISOString().split('T')[0],
@@ -239,7 +241,7 @@ async function startServer() {
       const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
       const appUrl = process.env.APP_URL || `${proto}://${host}`;
 
-      // Dispatch activation email asynchronously using free resource
+      // Dispatch activation email with 6-digit code asynchronously
       const emailResult = await sendActivationEmail({
         to: userDoc.email,
         name: userDoc.name,
@@ -247,6 +249,7 @@ async function startServer() {
         identifierCode: userDoc.identifierCode,
         courseTitle: userDoc.studentDetails?.enrolledCourseTitle || userDoc.instructorDetails?.department,
         cohort: userDoc.studentDetails?.cohort,
+        activationCode,
         activationToken,
         appUrl,
       });
@@ -256,12 +259,14 @@ async function startServer() {
       return res.status(201).json({
         success: true,
         user: sanitizedUser,
+        activationCode,
         emailStatus: {
           sent: emailResult.success,
           provider: emailResult.provider,
           activationUrl: emailResult.activationUrl,
+          activationCode,
           message: emailResult.success 
-            ? `Activation email dispatched to ${userDoc.email} via ${emailResult.provider}`
+            ? `Activation code [${activationCode}] sent to ${userDoc.email} via ${emailResult.provider}`
             : emailResult.error || 'Activation email pending delivery',
           error: emailResult.error,
         },
@@ -272,26 +277,40 @@ async function startServer() {
     }
   });
 
-  // Activate Account with token (One-Click activation via Email link)
+  // Activate Account with token or 6-digit code
   app.all(['/api/auth/activate', '/api/auth/verify-email'], async (req: Request, res: Response) => {
     try {
       const token = (req.query.token as string) || req.body?.token;
+      const code = (req.query.code as string) || req.body?.code;
       const email = (req.query.email as string) || req.body?.email;
 
-      if (!token && !email) {
-        return res.status(400).json({ error: 'Activation token or email is required.' });
+      if (!token && !code && !email) {
+        return res.status(400).json({ error: 'Activation code, token, or email is required.' });
       }
 
+      const cleanEmail = email ? email.toLowerCase().trim() : '';
+      const cleanCode = code ? code.toString().trim() : '';
       const { db, isFallback } = await getDatabase();
       let updatedUser: any = null;
 
       if (db && !isFallback) {
         const collection = db.collection('users');
-        const query: any = token ? { verificationToken: token } : { email: email.toLowerCase().trim() };
+        
+        let query: any = {};
+        if (token) {
+          query = { verificationToken: token };
+        } else if (cleanEmail && cleanCode) {
+          query = { email: cleanEmail, activationCode: cleanCode };
+        } else if (cleanCode) {
+          query = { activationCode: cleanCode };
+        } else if (cleanEmail) {
+          query = { email: cleanEmail };
+        }
+
         const user = await collection.findOne(query);
 
         if (!user) {
-          return res.status(404).json({ error: 'Invalid or expired activation link.' });
+          return res.status(404).json({ error: 'Invalid activation code or link. Please verify and try again.' });
         }
 
         await collection.updateOne(
@@ -303,30 +322,35 @@ async function startServer() {
               verifiedAt: new Date(),
               updatedAt: new Date(),
             },
-            $unset: { verificationToken: '' },
+            $unset: { verificationToken: '', activationCode: '' },
           }
         );
 
         updatedUser = await collection.findOne({ _id: user._id });
       } else {
         const store = getMemoryStore().users;
-        const user = Array.from(store.values()).find(
-          (u: any) => (token && u.verificationToken === token) || (email && u.email === email.toLowerCase().trim())
-        );
+        const user = Array.from(store.values()).find((u: any) => {
+          if (token && u.verificationToken === token) return true;
+          if (cleanEmail && cleanCode && u.email?.toLowerCase() === cleanEmail && u.activationCode === cleanCode) return true;
+          if (cleanCode && u.activationCode === cleanCode) return true;
+          if (cleanEmail && u.email?.toLowerCase() === cleanEmail) return true;
+          return false;
+        });
 
         if (!user) {
-          return res.status(404).json({ error: 'Invalid or expired activation link.' });
+          return res.status(404).json({ error: 'Invalid activation code or link. Please verify and try again.' });
         }
 
         user.isVerified = true;
         user.status = 'Active';
         user.verifiedAt = new Date();
         delete user.verificationToken;
+        delete user.activationCode;
         store.set(user.identifierCode, user);
         updatedUser = user;
       }
 
-      const { password: _, verificationToken: __, ...sanitized } = updatedUser;
+      const { password: _, verificationToken: __, activationCode: ___, ...sanitized } = updatedUser;
       return res.json({
         success: true,
         message: 'Your OJIS Media Academy account has been successfully verified & activated!',
@@ -351,6 +375,7 @@ async function startServer() {
       let targetUser: any = null;
 
       const newActivationToken = `act_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+      const newActivationCode = Math.floor(100000 + Math.random() * 900000).toString();
 
       if (db && !isFallback) {
         const collection = db.collection('users');
@@ -364,6 +389,7 @@ async function startServer() {
           {
             $set: {
               verificationToken: newActivationToken,
+              activationCode: newActivationCode,
               tokenCreatedAt: new Date(),
               updatedAt: new Date(),
             },
@@ -376,6 +402,7 @@ async function startServer() {
           return res.status(404).json({ error: 'No account found with this email address.' });
         }
         targetUser.verificationToken = newActivationToken;
+        targetUser.activationCode = newActivationCode;
         store.set(targetUser.identifierCode, targetUser);
       }
 
@@ -390,17 +417,20 @@ async function startServer() {
         identifierCode: targetUser.identifierCode,
         courseTitle: targetUser.studentDetails?.enrolledCourseTitle || targetUser.instructorDetails?.department,
         cohort: targetUser.studentDetails?.cohort,
+        activationCode: newActivationCode,
         activationToken: newActivationToken,
         appUrl,
       });
 
       return res.json({
         success: true,
-        message: `Activation email re-sent to ${targetUser.email}`,
+        message: `Activation code [${newActivationCode}] re-sent to ${targetUser.email}`,
+        activationCode: newActivationCode,
         emailStatus: {
           sent: emailResult.success,
           provider: emailResult.provider,
           activationUrl: emailResult.activationUrl,
+          activationCode: newActivationCode,
         },
       });
     } catch (err: any) {
@@ -436,6 +466,7 @@ async function startServer() {
           identifierCode: 'OJIS-MASTER-ADM-001',
           joinedDate: 'Academy Founding Council 2026',
           status: 'Verified',
+          isVerified: true,
           adminDetails: {
             department: 'Academic Board',
             clearanceLevel: 'Master Executive Director & Chancellor',
@@ -470,13 +501,34 @@ async function startServer() {
       }
 
       if (user) {
-        const { password: _, ...sanitizedUser } = user;
+        // Enforce Activation: Check if account is verified
+        const isUserVerified = user.isVerified === true || user.status === 'Verified' || user.role === 'admin';
+        if (!isUserVerified) {
+          return res.status(403).json({
+            success: false,
+            error: 'Your account is pending activation. Please enter the 6-digit activation code sent to your email to activate your account.',
+            isUnverified: true,
+            email: user.email,
+            identifierCode: user.identifierCode,
+            activationCode: user.activationCode,
+            role: user.role,
+          });
+        }
+
+        // Verify password if set
+        if (user.password && password && user.password !== password) {
+          return res.status(401).json({
+            error: 'Invalid password. Please check your credentials.',
+          });
+        }
+
+        const { password: _, verificationToken: __, activationCode: ___, ...sanitizedUser } = user;
         return res.json({ success: true, user: sanitizedUser });
       }
 
       // If user not found in DB, return 401
       return res.status(401).json({
-        error: 'Invalid credentials. Please verify your ID/Email or PIN.',
+        error: 'Invalid credentials. Please verify your ID/Email and password.',
       });
     } catch (err: any) {
       return res.status(500).json({ error: 'Login verification failed.', details: err?.message });
