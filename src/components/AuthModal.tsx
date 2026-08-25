@@ -22,7 +22,12 @@ import {
   Zap,
   Fingerprint,
   Crown,
-  Shield
+  Shield,
+  MailCheck,
+  Copy,
+  Check,
+  Send,
+  RefreshCw
 } from 'lucide-react';
 import { UserRole, AuthMode, UserAccount, LearningMode } from '../types';
 import { COURSES_DATA } from '../data/coursesData';
@@ -85,6 +90,16 @@ export function AuthModal({
   const [recoveryEmail, setRecoveryEmail] = useState('');
   const [recoverySubmitted, setRecoverySubmitted] = useState(false);
 
+  // Email Activation Confirmation State
+  const [activationSentInfo, setActivationSentInfo] = useState<{
+    user: UserAccount;
+    emailStatus?: { sent: boolean; provider: string; activationUrl?: string; message?: string; error?: string };
+  } | null>(null);
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState<string | null>(null);
+  const [isActivatingDirectly, setIsActivatingDirectly] = useState(false);
+  const [copiedLink, setCopiedLink] = useState(false);
+
   useEffect(() => {
     if (isOpen) {
       setActiveRole(initialRole);
@@ -92,6 +107,8 @@ export function AuthModal({
       setErrorMessage(null);
       setSuccessMessage(null);
       setRecoverySubmitted(false);
+      setActivationSentInfo(null);
+      setResendSuccess(null);
     }
   }, [isOpen, initialRole, initialMode]);
 
@@ -232,8 +249,60 @@ export function AuthModal({
       saveRegisteredUser(finalUser);
       setStoredUser(finalUser);
       setIsLoading(false);
-      onAuthSuccess(finalUser, `Student Account Created! Welcome ${finalUser.name}`);
-      onClose();
+
+      // Open email activation confirmation screen
+      setActivationSentInfo({
+        user: finalUser,
+        emailStatus: registerRes.emailStatus,
+      });
+    }
+  };
+
+  // Handle Resend Activation Email
+  const handleResendActivationEmail = async () => {
+    if (!activationSentInfo?.user?.email) return;
+    setIsResending(true);
+    setResendSuccess(null);
+    setErrorMessage(null);
+
+    try {
+      const res = await api.resendActivation(activationSentInfo.user.email);
+      if (res.success) {
+        setResendSuccess(`Fresh activation email dispatched to ${activationSentInfo.user.email}!`);
+      } else {
+        setErrorMessage(res.error || 'Failed to re-send activation email.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e?.message || 'Error communicating with activation server.');
+    } finally {
+      setIsResending(false);
+    }
+  };
+
+  // Handle Direct One-Click Activation
+  const handleDirectActivation = async () => {
+    if (!activationSentInfo?.user) return;
+    setIsActivatingDirectly(true);
+    setErrorMessage(null);
+
+    try {
+      const res = await api.activateAccount(undefined, activationSentInfo.user.email);
+      if (res.success) {
+        const activatedUser: UserAccount = {
+          ...(res.user || activationSentInfo.user),
+          status: 'Active',
+        };
+        setStoredUser(activatedUser);
+        saveRegisteredUser(activatedUser);
+        onAuthSuccess(activatedUser, `🎉 Account Activated! Welcome to OJIS Media Academy, ${activatedUser.name}`);
+        onClose();
+      } else {
+        setErrorMessage(res.error || 'Direct activation failed. Please click the link in your email.');
+      }
+    } catch (e: any) {
+      setErrorMessage(e?.message || 'Activation server error.');
+    } finally {
+      setIsActivatingDirectly(false);
     }
   };
 
@@ -332,8 +401,12 @@ export function AuthModal({
       saveRegisteredUser(finalUser);
       setStoredUser(finalUser);
       setIsLoading(false);
-      onAuthSuccess(finalUser, `Faculty Application Submitted for ${finalUser.name}`);
-      onClose();
+
+      // Open email activation confirmation screen
+      setActivationSentInfo({
+        user: finalUser,
+        emailStatus: regRes.emailStatus,
+      });
     }
   };
 
@@ -527,65 +600,67 @@ export function AuthModal({
         </div>
 
         {/* Role Selector Tabs (Student / Instructor / Admin) */}
-        <div className="p-2 sm:p-3 bg-slate-100/80 border-b border-slate-200">
-          <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 rounded-xl">
-            
-            {/* Student Tab */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('student');
-                setErrorMessage(null);
-              }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeRole === 'student'
-                  ? 'bg-blue-900 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <GraduationCap className="w-3.5 h-3.5" />
-              <span className="truncate">Student</span>
-            </button>
+        {!activationSentInfo && (
+          <div className="p-2 sm:p-3 bg-slate-100/80 border-b border-slate-200">
+            <div className="grid grid-cols-3 gap-1.5 p-1 bg-slate-200/80 rounded-xl">
+              
+              {/* Student Tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('student');
+                  setErrorMessage(null);
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeRole === 'student'
+                    ? 'bg-blue-900 text-white shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <GraduationCap className="w-3.5 h-3.5" />
+                <span className="truncate">Student</span>
+              </button>
 
-            {/* Instructor Tab */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('instructor');
-                setErrorMessage(null);
-              }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeRole === 'instructor'
-                  ? 'bg-blue-900 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <BookOpen className="w-3.5 h-3.5" />
-              <span className="truncate">Instructor</span>
-            </button>
+              {/* Instructor Tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('instructor');
+                  setErrorMessage(null);
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeRole === 'instructor'
+                    ? 'bg-blue-900 text-white shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                <span className="truncate">Instructor</span>
+              </button>
 
-            {/* Admin Tab */}
-            <button
-              type="button"
-              onClick={() => {
-                setActiveRole('admin');
-                setErrorMessage(null);
-              }}
-              className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
-                activeRole === 'admin'
-                  ? 'bg-blue-900 text-white shadow-xs'
-                  : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
-              }`}
-            >
-              <ShieldCheck className="w-3.5 h-3.5" />
-              <span className="truncate">Admin</span>
-            </button>
+              {/* Admin Tab */}
+              <button
+                type="button"
+                onClick={() => {
+                  setActiveRole('admin');
+                  setErrorMessage(null);
+                }}
+                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  activeRole === 'admin'
+                    ? 'bg-blue-900 text-white shadow-xs'
+                    : 'text-slate-700 hover:text-slate-900 hover:bg-white/60'
+                }`}
+              >
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span className="truncate">Admin</span>
+              </button>
 
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Mode Switcher: Sign In vs Sign Up */}
-        {authMode !== 'forgot_password' && (
+        {!activationSentInfo && authMode !== 'forgot_password' && (
           <div className="px-6 pt-4 flex items-center justify-between border-b border-slate-100 pb-3">
             <div>
               <h3 className="text-base sm:text-lg font-bold text-slate-900">
@@ -642,24 +717,157 @@ export function AuthModal({
         {/* Body Content */}
         <div className="p-5 sm:p-6 max-h-[68vh] overflow-y-auto space-y-4">
           
-          {/* Error Banner */}
-          {errorMessage && (
-            <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
-              <AlertCircle className="w-4 h-4 flex-shrink-0" />
-              <span>{errorMessage}</span>
-            </div>
-          )}
+          {/* Email Activation Confirmation Screen */}
+          {activationSentInfo ? (
+            <div className="py-2 space-y-4">
+              <div className="text-center space-y-2">
+                <div className="w-14 h-14 rounded-2xl bg-blue-50 border border-blue-200 text-blue-700 flex items-center justify-center mx-auto shadow-xs">
+                  <MailCheck className="w-7 h-7" />
+                </div>
+                <div>
+                  <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-semibold bg-emerald-100 text-emerald-800 mb-1">
+                    <CheckCircle2 className="w-3 h-3" /> Registration Successful
+                  </span>
+                  <h3 className="text-lg font-bold text-slate-900">
+                    Activation Email Dispatched!
+                  </h3>
+                  <p className="text-xs text-slate-600 max-w-md mx-auto mt-1">
+                    We have generated your credentials and sent an activation email with your verification link to:
+                  </p>
+                  <p className="text-sm font-bold text-blue-900 mt-1 break-all bg-blue-50/70 border border-blue-100 rounded-lg py-1.5 px-3 inline-block">
+                    {activationSentInfo.user.email}
+                  </p>
+                </div>
+              </div>
 
-          {/* Success Banner */}
-          {successMessage && (
-            <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
-              <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
-              <span>{successMessage}</span>
+              {/* Account Information Card */}
+              <div className="bg-slate-50 border border-slate-200/80 rounded-xl p-3.5 space-y-2 text-xs">
+                <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
+                  <span className="text-slate-500 font-medium">Official Identification:</span>
+                  <span className="font-bold text-blue-900 font-mono">{activationSentInfo.user.identifierCode}</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
+                  <span className="text-slate-500 font-medium">Account Name:</span>
+                  <span className="font-semibold text-slate-900">{activationSentInfo.user.name}</span>
+                </div>
+                <div className="flex items-center justify-between py-1 border-b border-slate-200/60">
+                  <span className="text-slate-500 font-medium">Program Track:</span>
+                  <span className="font-semibold text-slate-800">
+                    {activationSentInfo.user.studentDetails?.enrolledCourseTitle ||
+                      activationSentInfo.user.instructorDetails?.department ||
+                      'Academy Program'}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between py-1">
+                  <span className="text-slate-500 font-medium">Email Dispatch:</span>
+                  <span className="inline-flex items-center gap-1 font-semibold text-emerald-700">
+                    <Zap className="w-3 h-3 text-amber-500" />
+                    {activationSentInfo.emailStatus?.provider === 'gmail_smtp'
+                      ? 'Free Gmail SMTP (Sent)'
+                      : activationSentInfo.emailStatus?.provider === 'resend'
+                      ? 'Free Resend API (Sent)'
+                      : 'Live Token Active'}
+                  </span>
+                </div>
+              </div>
+
+              {resendSuccess && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{resendSuccess}</span>
+                </div>
+              )}
+
+              {/* Direct Activation Actions */}
+              <div className="space-y-2 pt-1">
+                <button
+                  type="button"
+                  onClick={handleDirectActivation}
+                  disabled={isActivatingDirectly}
+                  className="w-full py-2.5 px-4 bg-blue-900 hover:bg-blue-800 text-white rounded-xl font-bold text-xs flex items-center justify-center gap-2 shadow-xs transition-colors cursor-pointer disabled:opacity-50"
+                >
+                  {isActivatingDirectly ? (
+                    <>
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                      Activating Account...
+                    </>
+                  ) : (
+                    <>
+                      <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+                      Instant Activate & Enter Student Portal &rarr;
+                    </>
+                  )}
+                </button>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={handleResendActivationEmail}
+                    disabled={isResending}
+                    className="flex-1 py-2 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer disabled:opacity-50"
+                  >
+                    {isResending ? (
+                      <RefreshCw className="w-3.5 h-3.5 animate-spin text-slate-400" />
+                    ) : (
+                      <Send className="w-3.5 h-3.5 text-blue-900" />
+                    )}
+                    <span>Resend Email</span>
+                  </button>
+
+                  {activationSentInfo.emailStatus?.activationUrl && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (activationSentInfo.emailStatus?.activationUrl) {
+                          navigator.clipboard.writeText(activationSentInfo.emailStatus.activationUrl);
+                          setCopiedLink(true);
+                          setTimeout(() => setCopiedLink(false), 3000);
+                        }
+                      }}
+                      className="py-2 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors cursor-pointer"
+                    >
+                      {copiedLink ? (
+                        <>
+                          <Check className="w-3.5 h-3.5 text-emerald-600" />
+                          <span className="text-emerald-700">Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="w-3.5 h-3.5 text-slate-500" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              <p className="text-[11px] text-center text-slate-500 pt-1">
+                Tip: If you do not see the email in your main inbox within 1-2 minutes, please verify your spam or junk folder.
+              </p>
             </div>
+          ) : (
+            <>
+              {/* Error Banner */}
+              {errorMessage && (
+                <div className="p-3 rounded-xl bg-red-50 border border-red-200 text-red-700 text-xs flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 flex-shrink-0" />
+                  <span>{errorMessage}</span>
+                </div>
+              )}
+
+              {/* Success Banner */}
+              {successMessage && (
+                <div className="p-3 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800 text-xs flex items-center gap-2">
+                  <CheckCircle2 className="w-4 h-4 flex-shrink-0" />
+                  <span>{successMessage}</span>
+                </div>
+              )}
+            </>
           )}
 
           {/* -------------------- 1. STUDENT AUTH FORM -------------------- */}
-          {activeRole === 'student' && authMode === 'login' && (
+          {!activationSentInfo && activeRole === 'student' && authMode === 'login' && (
             <form onSubmit={handleStudentSubmit} className="space-y-3.5">
               <div>
                 <label className="block text-xs font-semibold text-slate-700 mb-1">

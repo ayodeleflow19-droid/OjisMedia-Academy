@@ -20,6 +20,7 @@ import { AuthModal } from './components/AuthModal';
 import { PortalModal } from './components/PortalModal';
 import { Course, StudentEnrollment, UserAccount, UserRole, AuthMode } from './types';
 import { getStoredUser, setStoredUser, clearStoredUser } from './data/authDemoData';
+import { api } from './lib/api';
 import { MessageSquare, Sparkles, CheckCircle2, X } from 'lucide-react';
 
 export default function App() {
@@ -58,6 +59,31 @@ export default function App() {
     const existingUser = getStoredUser();
     if (existingUser) {
       setCurrentUser(existingUser);
+    }
+
+    // Check for email activation token in URL query
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+    const email = params.get('email');
+    const isActivatePath = window.location.pathname.includes('/activate') || params.has('activate') || !!token;
+
+    if (token || (isActivatePath && email)) {
+      api.activateAccount(token || undefined, email || undefined).then((res) => {
+        if (res.success && res.user) {
+          setCurrentUser(res.user);
+          setStoredUser(res.user);
+          setToastMessage(`🎉 Account Verified & Activated! Welcome to OJIS Media Academy, ${res.user.name}!`);
+          setIsPortalModalOpen(true);
+          try {
+            // Clean URL query parameters
+            window.history.replaceState({}, document.title, window.location.pathname.replace('/activate', '') || '/');
+          } catch (e) {
+            // ignore
+          }
+        } else if (res.error) {
+          setToastMessage(`Activation notice: ${res.error}`);
+        }
+      });
     }
   }, []);
 

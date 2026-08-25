@@ -3,6 +3,7 @@ import path from 'path';
 import { createServer as createViteServer } from 'vite';
 import { getDatabase, getDatabaseStatus, getMemoryStore } from './server/db';
 import { SEED_CATEGORIES, SEED_COURSES } from './server/seedData';
+import { sendActivationEmail, getEmailProviderStatus, sendTestEmail } from './server/email';
 
 async function startServer() {
   const app = express();
@@ -165,7 +166,25 @@ async function startServer() {
   // 3. USER AUTHENTICATION & PORTAL APIS
   // ==========================================
 
-  // Register new account (Student / Instructor / Admin)
+  // Check Email Service configuration status
+  app.get('/api/email/status', (_req: Request, res: Response) => {
+    const status = getEmailProviderStatus();
+    return res.json({ success: true, emailService: status });
+  });
+
+  // Send diagnostic test email
+  app.post('/api/email/test-send', async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      const targetEmail = (email || 'ayodeleflow19@gmail.com').trim().toLowerCase();
+      const result = await sendTestEmail(targetEmail);
+      return res.json(result);
+    } catch (e: any) {
+      return res.status(500).json({ success: false, error: e?.message || 'Error sending test email' });
+    }
+  });
+
+  // Register new account (Student / Instructor / Admin) with email activation
   app.post('/api/auth/register', async (req: Request, res: Response) => {
     try {
       const { name, email, password, role, studentDetails, instructorDetails, adminDetails } = req.body;
@@ -177,15 +196,19 @@ async function startServer() {
       const id = `usr_${Date.now()}`;
       const prefix = role === 'student' ? 'STD' : role === 'instructor' ? 'FAC' : 'ADM';
       const identifierCode = `OJIS-${prefix}-${new Date().getFullYear()}-${Math.floor(100 + Math.random() * 900)}`;
+      const activationToken = `act_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
 
       const userDoc = {
         id,
-        name,
+        name: name.trim(),
         email: email.toLowerCase().trim(),
         role,
         password: password || 'demo1234',
         identifierCode,
-        status: 'Active',
+        status: 'Active', // Active by default with verified flag
+        isVerified: false,
+        verificationToken: activationToken,
+        tokenCreatedAt: new Date(),
         joinedDate: new Date().toISOString().split('T')[0],
         studentDetails: studentDetails || undefined,
         instructorDetails: instructorDetails || undefined,
@@ -211,12 +234,178 @@ async function startServer() {
         store.set(userDoc.identifierCode, userDoc);
       }
 
-      // Return sanitized user object
-      const { password: _, ...sanitizedUser } = userDoc;
-      return res.status(201).json({ success: true, user: sanitizedUser });
+      // Determine App Base URL for the activation link
+      const host = req.headers.host || 'localhost:3000';
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+      const appUrl = process.env.APP_URL || `${proto}://${host}`;
+
+      // Dispatch activation email asynchronously using free resource
+      const emailResult = await sendActivationEmail({
+        to: userDoc.email,
+        name: userDoc.name,
+        role: userDoc.role as any,
+        identifierCode: userDoc.identifierCode,
+        courseTitle: userDoc.studentDetails?.enrolledCourseTitle || userDoc.instructorDetails?.department,
+        cohort: userDoc.studentDetails?.cohort,
+        activationToken,
+        appUrl,
+      });
+
+      // Return sanitized user object & activation meta
+      const { password: _, verificationToken: __, ...sanitizedUser } = userDoc;
+      return res.status(201).json({
+        success: true,
+        user: sanitizedUser,
+        emailStatus: {
+          sent: emailResult.success,
+          provider: emailResult.provider,
+          activationUrl: emailResult.activationUrl,
+          message: emailResult.success 
+            ? `Activation email dispatched to ${userDoc.email} via ${emailResult.provider}`
+            : emailResult.error || 'Activation email pending delivery',
+          error: emailResult.error,
+        },
+      });
     } catch (err: any) {
       console.error('Error during registration:', err);
       return res.status(500).json({ error: 'Failed to create user account.', details: err?.message });
+    }
+  });
+
+  // Activate Account with token (One-Click activation via Email link)
+  app.all(['/api/auth/activate', '/api/auth/verify-email'], async (req: Request, res: Response) => {
+    try {
+      const token = (req.query.token as string) || req.body?.token;
+      const email = (req.query.email as string) || req.body?.email;
+
+      if (!token && !email) {
+        return res.status(400).json({ error: 'Activation token or email is required.' });
+      }
+
+      const { db, isFallback } = await getDatabase();
+      let updatedUser: any = null;
+
+      if (db && !isFallback) {
+        const collection = db.collection('users');
+        const query: any = token ? { verificationToken: token } : { email: email.toLowerCase().trim() };
+        const user = await collection.findOne(query);
+
+        if (!user) {
+          return res.status(404).json({ error: 'Invalid or expired activation link.' });
+        }
+
+        await collection.updateOne(
+          { _id: user._id },
+          {
+            $set: {
+              isVerified: true,
+              status: 'Active',
+              verifiedAt: new Date(),
+              updatedAt: new Date(),
+            },
+            $unset: { verificationToken: '' },
+          }
+        );
+
+        updatedUser = await collection.findOne({ _id: user._id });
+      } else {
+        const store = getMemoryStore().users;
+        const user = Array.from(store.values()).find(
+          (u: any) => (token && u.verificationToken === token) || (email && u.email === email.toLowerCase().trim())
+        );
+
+        if (!user) {
+          return res.status(404).json({ error: 'Invalid or expired activation link.' });
+        }
+
+        user.isVerified = true;
+        user.status = 'Active';
+        user.verifiedAt = new Date();
+        delete user.verificationToken;
+        store.set(user.identifierCode, user);
+        updatedUser = user;
+      }
+
+      const { password: _, verificationToken: __, ...sanitized } = updatedUser;
+      return res.json({
+        success: true,
+        message: 'Your OJIS Media Academy account has been successfully verified & activated!',
+        user: sanitized,
+      });
+    } catch (err: any) {
+      console.error('Error activating account:', err);
+      return res.status(500).json({ error: 'Failed to activate account.', details: err?.message });
+    }
+  });
+
+  // Resend Activation Email
+  app.post('/api/auth/resend-activation', async (req: Request, res: Response) => {
+    try {
+      const { email } = req.body;
+      if (!email) {
+        return res.status(400).json({ error: 'Email address is required.' });
+      }
+
+      const cleanEmail = email.toLowerCase().trim();
+      const { db, isFallback } = await getDatabase();
+      let targetUser: any = null;
+
+      const newActivationToken = `act_${Math.random().toString(36).substring(2)}${Date.now().toString(36)}`;
+
+      if (db && !isFallback) {
+        const collection = db.collection('users');
+        targetUser = await collection.findOne({ email: cleanEmail });
+        if (!targetUser) {
+          return res.status(404).json({ error: 'No account found with this email address.' });
+        }
+
+        await collection.updateOne(
+          { _id: targetUser._id },
+          {
+            $set: {
+              verificationToken: newActivationToken,
+              tokenCreatedAt: new Date(),
+              updatedAt: new Date(),
+            },
+          }
+        );
+      } else {
+        const store = getMemoryStore().users;
+        targetUser = Array.from(store.values()).find((u: any) => u.email === cleanEmail);
+        if (!targetUser) {
+          return res.status(404).json({ error: 'No account found with this email address.' });
+        }
+        targetUser.verificationToken = newActivationToken;
+        store.set(targetUser.identifierCode, targetUser);
+      }
+
+      const host = req.headers.host || 'localhost:3000';
+      const proto = (req.headers['x-forwarded-proto'] as string) || req.protocol || 'https';
+      const appUrl = process.env.APP_URL || `${proto}://${host}`;
+
+      const emailResult = await sendActivationEmail({
+        to: targetUser.email,
+        name: targetUser.name,
+        role: targetUser.role,
+        identifierCode: targetUser.identifierCode,
+        courseTitle: targetUser.studentDetails?.enrolledCourseTitle || targetUser.instructorDetails?.department,
+        cohort: targetUser.studentDetails?.cohort,
+        activationToken: newActivationToken,
+        appUrl,
+      });
+
+      return res.json({
+        success: true,
+        message: `Activation email re-sent to ${targetUser.email}`,
+        emailStatus: {
+          sent: emailResult.success,
+          provider: emailResult.provider,
+          activationUrl: emailResult.activationUrl,
+        },
+      });
+    } catch (err: any) {
+      console.error('Error re-sending activation email:', err);
+      return res.status(500).json({ error: 'Failed to re-send activation email.', details: err?.message });
     }
   });
 
